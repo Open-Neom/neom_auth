@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:neom_commons/commons/ui/theme/app_theme.dart';
+import 'package:neom_commons/ui/theme/app_theme.dart';
 
 Widget buildEntryField(String hint, {required TextEditingController controller,
   bool isPassword = false, bool isEmail = false}) {

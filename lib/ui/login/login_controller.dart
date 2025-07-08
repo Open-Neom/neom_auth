@@ -1,31 +1,26 @@
-// ignore_for_file: unused_import
-import 'dart:convert';
 import 'dart:io';
-import 'dart:math';
 
-import 'package:crypto/crypto.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fba;
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package:neom_commons/commons/utils/app_utilities.dart';
-import 'package:neom_commons/commons/utils/constants/app_page_id_constants.dart';
-import 'package:neom_commons/commons/utils/constants/message_translation_constants.dart';
-import 'package:neom_core/core/app_config.dart';
-import 'package:neom_core/core/data/firestore/constants/app_firestore_constants.dart';
-import 'package:neom_core/core/data/implementations/user_controller.dart';
-import 'package:neom_core/core/domain/use_cases/login_service.dart';
-import 'package:neom_core/core/utils/constants/app_route_constants.dart';
-import 'package:neom_core/core/utils/enums/auth_status.dart';
-import 'package:neom_core/core/utils/validator.dart';
+import 'package:neom_commons/utils/app_utilities.dart';
+import 'package:neom_commons/utils/constants/app_page_id_constants.dart';
+import 'package:neom_commons/utils/constants/message_translation_constants.dart';
+import 'package:neom_commons/utils/device_utilities.dart';
+import 'package:neom_commons/utils/security_utilities.dart';
+import 'package:neom_core/app_config.dart';
+import 'package:neom_core/data/firestore/constants/app_firestore_constants.dart';
+import 'package:neom_core/data/implementations/user_controller.dart';
+import 'package:neom_core/domain/use_cases/login_service.dart';
+import 'package:neom_core/utils/constants/app_route_constants.dart';
+import 'package:neom_core/utils/enums/auth_status.dart';
+import 'package:neom_core/utils/validator.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 import '../../utils/enums/login_method.dart';
 import '../../utils/enums/signed_in_with.dart';
-import '../on_going.dart';
-import 'login_page.dart';
 
 class LoginController extends GetxController implements LoginService {
 
@@ -75,7 +70,7 @@ class LoginController extends GetxController implements LoginService {
       }
     }
     if(Platform.isIOS && !kIsWeb ) {
-      isIOS13OrHigher = AppUtilities.isDeviceSupportedVersion(isIOS: Platform.isIOS);
+      isIOS13OrHigher = DeviceUtilities.isDeviceSupportedVersion(isIOS: Platform.isIOS);
     } else if (Platform.isAndroid) {
       AppConfig.logger.t(Platform.version);
     }
@@ -296,7 +291,6 @@ class LoginController extends GetxController implements LoginService {
 
   }
 
-
   @override
   Future<void> googleLogin() async {
 
@@ -381,7 +375,7 @@ class LoginController extends GetxController implements LoginService {
           break;
         case(LoginMethod.apple):
           final rawNonce = generateNonce();
-          final nonce = AppUtilities.sha256ofString(rawNonce);
+          final nonce = SecurityUtilities.sha256ofString(rawNonce);
 
           AuthorizationCredentialAppleID appleCredential = await SignInWithApple.getAppleIDCredential(
             scopes: [
@@ -505,4 +499,5 @@ class LoginController extends GetxController implements LoginService {
   void setIsPhoneAuth(bool value) {
     isPhoneAuth = value;
   }
+
 }
