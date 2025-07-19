@@ -7,7 +7,8 @@ import 'package:get/get.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:neom_commons/utils/app_utilities.dart';
 import 'package:neom_commons/utils/constants/app_page_id_constants.dart';
-import 'package:neom_commons/utils/constants/message_translation_constants.dart';
+import 'package:neom_commons/utils/constants/translations/common_translation_constants.dart';
+import 'package:neom_commons/utils/constants/translations/message_translation_constants.dart';
 import 'package:neom_commons/utils/device_utilities.dart';
 import 'package:neom_commons/utils/security_utilities.dart';
 import 'package:neom_core/app_config.dart';
@@ -416,7 +417,7 @@ class LoginController extends GetxController implements LoginService {
     } catch (e) {
       AppConfig.logger.e(e.toString());
       AppUtilities.showSnackBar(
-        title: MessageTranslationConstants.underConstruction.tr,
+        title: CommonTranslationConstants.underConstruction.tr,
         message: e.toString(),
       );
     }

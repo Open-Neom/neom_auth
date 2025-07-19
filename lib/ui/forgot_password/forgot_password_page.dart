@@ -5,7 +5,9 @@ import 'package:neom_commons/ui/theme/app_theme.dart';
 import 'package:neom_commons/ui/widgets/appbar_child.dart';
 import 'package:neom_commons/ui/widgets/core_widgets.dart';
 import 'package:neom_commons/utils/constants/app_page_id_constants.dart';
-import 'package:neom_commons/utils/constants/app_translation_constants.dart';
+import 'package:neom_commons/utils/constants/translations/app_translation_constants.dart';
+import 'package:neom_commons/utils/constants/translations/common_translation_constants.dart';
+import '../../utils/constants/auth_translation_constants.dart';
 import 'forgot_password_controller.dart';
 
 class ForgotPasswordPage extends StatelessWidget {
@@ -27,8 +29,8 @@ class ForgotPasswordPage extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: <Widget>[
-                buildLabel(context, AppTranslationConstants.forgotPassword.tr,
-                    AppTranslationConstants.passwordResetInstruction.tr),
+                buildLabel(context, AuthTranslationConstants.forgotPassword.tr,
+                    AuthTranslationConstants.passwordResetInstruction.tr),
                 Container(
                   margin: const EdgeInsets.symmetric(vertical: 15),
                   decoration: AppTheme.kBoxDecorationStyle,
@@ -38,7 +40,7 @@ class ForgotPasswordPage extends StatelessWidget {
                     keyboardType: TextInputType.emailAddress,
                     style: const TextStyle(fontStyle: FontStyle.normal,fontWeight: FontWeight.normal),
                     decoration: InputDecoration(
-                        hintText: AppTranslationConstants.enterEmail.tr,
+                        hintText: CommonTranslationConstants.enterEmail.tr,
                         border: InputBorder.none,
                         contentPadding:const EdgeInsets.symmetric(vertical: 15,horizontal: 10)
                     ),

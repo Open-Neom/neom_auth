@@ -7,9 +7,9 @@ import 'package:neom_commons/ui/theme/app_color.dart';
 import 'package:neom_commons/ui/theme/app_theme.dart';
 import 'package:neom_commons/ui/widgets/app_circular_progress_indicator.dart';
 import 'package:neom_commons/ui/widgets/header_intro.dart';
-import 'package:neom_commons/utils/constants/app_translation_constants.dart';
 import 'package:neom_core/app_config.dart';
 import 'package:neom_core/utils/constants/core_constants.dart';
+import '../../utils/constants/auth_translation_constants.dart';
 import '../widgets/login_widgets.dart';
 import 'login_controller.dart';
 
@@ -29,14 +29,14 @@ class LoginPage extends StatelessWidget {
             height: AppTheme.fullHeight(context),
               decoration: AppTheme.appBoxDecoration,
             child: Obx(()=> _.isLoading.value ? AppCircularProgressIndicator(
-              subtitle:AppTranslationConstants.loadingAccount.tr,
+              subtitle: AuthTranslationConstants.loadingAccount.tr,
               fontSize: 20,
             ) : Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: <Widget>[
                 HeaderIntro(title: kDebugMode && !kIsWeb && Platform.isAndroid ? CoreConstants.dev : "",),
                 AppTheme.heightSpace20,
-                Text(AppTranslationConstants.signIn.tr,
+                Text(AuthTranslationConstants.signIn.tr,
                   style: const TextStyle(
                     color: Colors.white, fontSize: 25.0,
                     fontFamily: AppTheme.fontFamily,

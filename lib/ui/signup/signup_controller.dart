@@ -3,8 +3,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:neom_commons/utils/app_utilities.dart';
-import 'package:neom_commons/utils/constants/app_translation_constants.dart';
-import 'package:neom_commons/utils/constants/message_translation_constants.dart';
+import 'package:neom_commons/utils/constants/translations/message_translation_constants.dart';
 import 'package:neom_core/app_config.dart';
 import 'package:neom_core/data/firestore/constants/app_firestore_constants.dart';
 import 'package:neom_core/data/firestore/user_firestore.dart';
@@ -13,6 +12,7 @@ import 'package:neom_core/domain/model/app_user.dart';
 import 'package:neom_core/utils/validator.dart';
 
 import '../../domain/use_cases/signup_service.dart';
+import '../../utils/constants/auth_translation_constants.dart';
 import '../../utils/enums/signed_in_with.dart';
 import '../login/login_controller.dart';
 
@@ -109,7 +109,7 @@ class SignUpController extends GetxController implements SignUpService {
 
     try {
       userController.user =  AppUser(
-        homeTown: AppTranslationConstants.somewhereUniverse.tr,
+        homeTown: AuthTranslationConstants.somewhereUniverse.tr,
         photoUrl: "",
         name: usernameController.text.trim(),
         firstName: firstNameController.text.trim(),

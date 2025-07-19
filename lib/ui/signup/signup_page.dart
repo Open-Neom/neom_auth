@@ -5,10 +5,12 @@ import 'package:neom_commons/ui/theme/app_theme.dart';
 import 'package:neom_commons/ui/widgets/appbar_child.dart';
 import 'package:neom_commons/ui/widgets/core_widgets.dart';
 import 'package:neom_commons/utils/constants/app_page_id_constants.dart';
-import 'package:neom_commons/utils/constants/app_translation_constants.dart';
+import 'package:neom_commons/utils/constants/translations/app_translation_constants.dart';
+import 'package:neom_commons/utils/constants/translations/common_translation_constants.dart';
 import 'package:neom_commons/utils/external_utilities.dart';
 import 'package:neom_core/app_properties.dart';
 
+import '../../utils/constants/auth_translation_constants.dart';
 import '../widgets/signup_widgets.dart';
 import 'signup_controller.dart';
 
@@ -36,15 +38,15 @@ class SignupPage extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: <Widget>[
-                    buildLabel(context, AppTranslationConstants.welcomeToApp.tr, AppTranslationConstants.youWillFindMsg.tr),
+                    buildLabel(context, CommonTranslationConstants.welcomeToApp.tr, AuthTranslationConstants.youWillFindMsg.tr),
                     buildTwoEntryFields(AppTranslationConstants.firstName.tr, AppTranslationConstants.lastName.tr,
                         firstController: _.firstNameController, secondController: _.lastNameController, fieldsContext: context),
                     buildEntryField(AppTranslationConstants.username.tr, controller: _.usernameController),
-                    buildEntryField(AppTranslationConstants.enterEmail.tr,
+                    buildEntryField(CommonTranslationConstants.enterEmail.tr,
                         controller: _.emailController, isEmail: true),
-                    buildEntryField(AppTranslationConstants.enterPassword.tr,
+                    buildEntryField(AuthTranslationConstants.enterPassword.tr,
                         controller: _.passwordController, isPassword: true),
-                    buildEntryField(AppTranslationConstants.confirmPassword.tr,
+                    buildEntryField(AuthTranslationConstants.confirmPassword.tr,
                         controller: _.confirmController, isPassword: true),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -55,11 +57,11 @@ class SignupPage extends StatelessWidget {
                             _.setTermsAgreement(value ?? false);
                           },
                         ),
-                        Text(AppTranslationConstants.iHaveReadAndAccept.tr,
+                        Text(CommonTranslationConstants.iHaveReadAndAccept.tr,
                           style: const TextStyle(fontSize: 12),
                         ),
                         TextButton(
-                            child: Text(AppTranslationConstants.termsAndConditions.tr,
+                            child: Text(CommonTranslationConstants.termsAndConditions.tr,
                               style: const TextStyle(fontSize: 12),
                             ),
                             onPressed: () async {
@@ -77,7 +79,7 @@ class SignupPage extends StatelessWidget {
                           padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 10),
                           backgroundColor: AppColor.getMain(),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(40)),),
-                        child: Text(AppTranslationConstants.signUp.tr, style: const TextStyle(color: Colors.white,fontSize: 16.0,
+                        child: Text(AuthTranslationConstants.signUp.tr, style: const TextStyle(color: Colors.white,fontSize: 16.0,
                             fontWeight: FontWeight.bold)),
                       ),
                     ),

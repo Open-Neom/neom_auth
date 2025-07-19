@@ -4,11 +4,13 @@ import 'package:get/get.dart';
 import 'package:neom_commons/ui/theme/app_color.dart';
 import 'package:neom_commons/ui/theme/app_theme.dart';
 import 'package:neom_commons/utils/constants/app_assets.dart';
-import 'package:neom_commons/utils/constants/app_translation_constants.dart';
-import 'package:neom_commons/utils/constants/message_translation_constants.dart';
+import 'package:neom_commons/utils/constants/translations/app_translation_constants.dart';
+import 'package:neom_commons/utils/constants/translations/common_translation_constants.dart';
+import 'package:neom_commons/utils/constants/translations/message_translation_constants.dart';
 import 'package:neom_core/app_config.dart';
 import 'package:neom_core/utils/constants/app_route_constants.dart';
 
+import '../../utils/constants/auth_translation_constants.dart';
 import '../../utils/enums/login_method.dart';
 import '../login/login_controller.dart';
 
@@ -38,7 +40,7 @@ import '../login/login_controller.dart';
                 Icons.email,
                 color: Colors.white,
               ),
-              hintText: AppTranslationConstants.enterEmail.tr,
+              hintText: CommonTranslationConstants.enterEmail.tr,
               hintStyle: AppTheme.kHintTextStyle,
             ),
           ),
@@ -71,7 +73,7 @@ import '../login/login_controller.dart';
                 Icons.lock,
                 color: Colors.white,
               ),
-              hintText: AppTranslationConstants.enterPassword.tr,
+              hintText: AuthTranslationConstants.enterPassword.tr,
               hintStyle: AppTheme.kHintTextStyle,
             ),
           ),
@@ -86,7 +88,7 @@ import '../login/login_controller.dart';
       child: TextButton(
         onPressed: () => Get.toNamed(AppRouteConstants.forgotPassword),
         style: TextButton.styleFrom(padding: const EdgeInsets.only(right: 0.0)),
-        child: Text(AppTranslationConstants.forgotPassword.tr,
+        child: Text(AuthTranslationConstants.forgotPassword.tr,
           style: AppTheme.kLabelStyle,
         ),
       ),
@@ -169,7 +171,7 @@ import '../login/login_controller.dart';
           ),
         ),
         Text(
-          AppTranslationConstants.signInWith.tr,
+          AuthTranslationConstants.signInWith.tr,
           style: AppTheme.kLabelStyle,
         ),
       ],
@@ -251,7 +253,7 @@ import '../login/login_controller.dart';
         text: TextSpan(
           children: [
             TextSpan(
-              text: AppTranslationConstants.dontHaveAnAccount.tr,
+              text: AuthTranslationConstants.dontHaveAnAccount.tr,
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 18.0,
@@ -259,7 +261,7 @@ import '../login/login_controller.dart';
               ),
             ),
             TextSpan(
-              text: AppTranslationConstants.signUp.tr,
+              text: AuthTranslationConstants.signUp.tr,
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 18.0,
