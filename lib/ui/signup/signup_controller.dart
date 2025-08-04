@@ -7,19 +7,18 @@ import 'package:neom_commons/utils/constants/translations/message_translation_co
 import 'package:neom_core/app_config.dart';
 import 'package:neom_core/data/firestore/constants/app_firestore_constants.dart';
 import 'package:neom_core/data/firestore/user_firestore.dart';
-import 'package:neom_core/data/implementations/user_controller.dart';
 import 'package:neom_core/domain/model/app_user.dart';
+import 'package:neom_core/domain/use_cases/login_service.dart';
+import 'package:neom_core/domain/use_cases/user_service.dart';
+import 'package:neom_core/utils/enums/signed_in_with.dart';
 import 'package:neom_core/utils/validator.dart';
-
 import '../../domain/use_cases/signup_service.dart';
 import '../../utils/constants/auth_translation_constants.dart';
-import '../../utils/enums/signed_in_with.dart';
-import '../login/login_controller.dart';
 
 class SignUpController extends GetxController implements SignUpService {
 
-  final loginController = Get.find<LoginController>();
-  final userController = Get.find<UserController>();
+  final loginServiceImpl = Get.find<LoginService>();
+  final userServiceImpl = Get.find<UserService>();
 
   final TextEditingController firstNameController = TextEditingController();
   final TextEditingController lastNameController = TextEditingController();
@@ -64,14 +63,14 @@ class SignUpController extends GetxController implements SignUpService {
       if(await validateInfo()) {
         setUserFromSignUp();
 
-        User? fbaUser = (await loginController.auth
+        User? fbaUser = (await loginServiceImpl.auth
             .createUserWithEmailAndPassword(
             email: emailController.text.toLowerCase().trim(),
             password: passwordController.text.trim())
         ).user;
 
-        loginController.signedInWith = SignedInWith.signUp;
-        loginController.fbaUser.value = fbaUser;
+        loginServiceImpl.signedInWith = SignedInWith.signUp;
+        loginServiceImpl.fbaUser = fbaUser;
 
       }
     } on FirebaseAuthException catch (e) {
@@ -108,7 +107,7 @@ class SignUpController extends GetxController implements SignUpService {
     AppConfig.logger.d("Getting User Info From Sign-up text fields");
 
     try {
-      userController.user =  AppUser(
+      userServiceImpl.user =  AppUser(
         homeTown: AuthTranslationConstants.somewhereUniverse.tr,
         photoUrl: "",
         name: usernameController.text.trim(),
@@ -122,7 +121,7 @@ class SignUpController extends GetxController implements SignUpService {
       AppConfig.logger.e(e.toString());
     }
 
-    AppConfig.logger.d("User Info set: ${userController.user.toString()}");
+    AppConfig.logger.d("User Info set: ${userServiceImpl.user.toString()}");
   }
 
   @override

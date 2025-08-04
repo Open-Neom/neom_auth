@@ -13,19 +13,19 @@ import 'package:neom_commons/utils/device_utilities.dart';
 import 'package:neom_commons/utils/security_utilities.dart';
 import 'package:neom_core/app_config.dart';
 import 'package:neom_core/data/firestore/constants/app_firestore_constants.dart';
-import 'package:neom_core/data/implementations/user_controller.dart';
+import 'package:neom_core/data/implementations/app_hive_controller.dart';
 import 'package:neom_core/domain/use_cases/login_service.dart';
+import 'package:neom_core/domain/use_cases/user_service.dart';
 import 'package:neom_core/utils/constants/app_route_constants.dart';
 import 'package:neom_core/utils/enums/auth_status.dart';
+import 'package:neom_core/utils/enums/signed_in_with.dart';
 import 'package:neom_core/utils/validator.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
-
 import '../../utils/enums/login_method.dart';
-import '../../utils/enums/signed_in_with.dart';
 
 class LoginController extends GetxController implements LoginService {
 
-  final userController = Get.find<UserController>();
+  final userServiceImpl = Get.find<UserService>();
 
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
@@ -40,10 +40,10 @@ class LoginController extends GetxController implements LoginService {
   final String _fbAccessToken = "";
   fba.AuthCredential? credentials;
 
-  fba.FirebaseAuth auth = fba.FirebaseAuth.instance;
-  final Rxn<fba.User> fbaUser = Rxn<fba.User>();
+  fba.FirebaseAuth _auth = fba.FirebaseAuth.instance;
+  final Rxn<fba.User> _fbaUser = Rxn<fba.User>();
 
-  SignedInWith signedInWith = SignedInWith.notDetermined;
+  SignedInWith _signedInWith = SignedInWith.notDetermined;
   LoginMethod loginMethod = LoginMethod.notDetermined;
   
   final RxBool isLoading = true.obs;
@@ -58,10 +58,9 @@ class LoginController extends GetxController implements LoginService {
   void onInit() {
     super.onInit();
     AppConfig.logger.t("onInit Login Controller");
-    // appInfo.value = AppInfo();
-    fbaUser.value = auth.currentUser;
-    ever<fba.User?>(fbaUser, handleAuthChanged);
-    fbaUser.bindStream(auth.authStateChanges());
+    _fbaUser.value = _auth.currentUser;
+    ever<fba.User?>(_fbaUser, handleAuthChanged);
+    _fbaUser.bindStream(_auth.authStateChanges());
 
     if(kIsWeb) {
       _googleSignIn = GoogleSignIn(clientId: '444807211272-qlk8fl7dp6lg5d5o7hq6dkv2rj80m8kt.apps.googleusercontent.com');
@@ -92,24 +91,24 @@ class LoginController extends GetxController implements LoginService {
     if(isPhoneAuth) return;
 
     try {
-      if(auth.currentUser == null) {
+      if(_auth.currentUser == null) {
         authStatus.value = AuthStatus.notLoggedIn;
-        auth = fba.FirebaseAuth.instance;
-      } else if (user == null && auth.currentUser != null) {
+        _auth = fba.FirebaseAuth.instance;
+      } else if (user == null && _auth.currentUser != null) {
         authStatus.value = AuthStatus.notLoggedIn;
-        user = auth.currentUser!;
+        user = _auth.currentUser!;
       } else if(user != null) {
         if(user.providerData.isNotEmpty) {
           _userId = user.providerData.first.uid!;
           if(Validator.isEmail(_userId) || (user.providerData.first.email?.isNotEmpty ?? false)) {
             String email = Validator.isEmail(_userId) ? _userId : user.providerData.first.email ?? '';
-            await userController.setUserByEmail(email);
+            await userServiceImpl.setUserByEmail(email);
           } else if(_userId.isNotEmpty) {
-            await userController.setUserById(_userId);
+            await userServiceImpl.setUserById(_userId);
           }
         }
 
-        if(userController.user.id.isEmpty) {
+        if(userServiceImpl.user.id.isEmpty) {
           AppConfig.logger.d("User not found in Firestore for $_userId.");
           switch(signedInWith) {
             case(SignedInWith.signUp):
@@ -118,7 +117,7 @@ class LoginController extends GetxController implements LoginService {
             case(SignedInWith.email):
             case(SignedInWith.google):
             case(SignedInWith.apple):
-              userController.getUserFromFirebase(user);
+              userServiceImpl.getUserFromFirebase(user);
               break;
             case(SignedInWith.facebook):
             case(SignedInWith.spotify):
@@ -127,14 +126,15 @@ class LoginController extends GetxController implements LoginService {
               authStatus.value = AuthStatus.notDetermined;
               break;
           }
-        } else if(!userController.isNewUser && userController.user.profiles.isEmpty) {
+        } else if(!userServiceImpl.isNewUser && userServiceImpl.user.profiles.isEmpty) {
           AppConfig.logger.i("No Profiles found for $_userId. Please Login Again");
           authStatus.value = AuthStatus.notLoggedIn;
         } else {
           authStatus.value = AuthStatus.loggedIn;
+          await Get.find<AppHiveController>().writeProfileInfo();
         }
 
-        if(userController.isNewUser && userController.user.id.isNotEmpty) {
+        if(userServiceImpl.isNewUser && userServiceImpl.user.id.isNotEmpty) {
           gotoIntroPage();
         } else {
           AppConfig.logger.i("User found for $_userId. Redirecting to Root Page");
@@ -199,14 +199,14 @@ class LoginController extends GetxController implements LoginService {
 
     fba.User? emailUser;
     try {
-      fba.UserCredential userCredential = await auth.signInWithEmailAndPassword(
+      fba.UserCredential userCredential = await _auth.signInWithEmailAndPassword(
         email: emailController.text.trim(),
         password: passwordController.text.trim()
       );
 
        if(userCredential.user != null) {
          emailUser = userCredential.user;
-         fbaUser.value = emailUser;
+         _fbaUser.value = emailUser;
          authStatus.value = AuthStatus.loggedIn;
          signedInWith = SignedInWith.email;
        }
@@ -257,8 +257,8 @@ class LoginController extends GetxController implements LoginService {
       await setAuthCredentials();
 
       if(credentials != null) {
-        fba.UserCredential userCredential = await auth.signInWithCredential(credentials!);
-        fbaUser.value = userCredential.user;
+        fba.UserCredential userCredential = await _auth.signInWithCredential(credentials!);
+        _fbaUser.value = userCredential.user;
         authStatus.value = AuthStatus.loggedIn;
         signedInWith = SignedInWith.apple;
       }
@@ -266,7 +266,7 @@ class LoginController extends GetxController implements LoginService {
     } on SignInWithAppleAuthorizationException catch (e) {
 
       AppConfig.logger.e(e.toString());
-      fbaUser.value = null;
+      _fbaUser.value = null;
       authStatus.value = AuthStatus.notLoggedIn;
 
       if(e.code != AuthorizationErrorCode.canceled) {
@@ -277,7 +277,7 @@ class LoginController extends GetxController implements LoginService {
       }
 
     } catch (e) {
-      fbaUser.value = null;
+      _fbaUser.value = null;
       authStatus.value = AuthStatus.notLoggedIn;
       AppConfig.logger.e(e.toString());
 
@@ -301,12 +301,12 @@ class LoginController extends GetxController implements LoginService {
        await setAuthCredentials();
 
       if(credentials != null) {
-        fbaUser.value = (await auth.signInWithCredential(credentials!)).user;
+        _fbaUser.value = (await _auth.signInWithCredential(credentials!)).user;
         authStatus.value = AuthStatus.loggedIn;
         signedInWith = SignedInWith.google;
       }
     } catch (e) {
-      fbaUser.value = null;
+      _fbaUser.value = null;
       authStatus.value = AuthStatus.notLoggedIn;
       AppConfig.logger.e(e.toString());
 
@@ -332,7 +332,7 @@ class LoginController extends GetxController implements LoginService {
   Future<void> signOut() async {
     AppConfig.logger.d("Entering signOut method");
     try {
-      await auth.signOut();
+      await _auth.signOut();
       await googleLogout();
       clear();
       Get.offAllNamed(AppRouteConstants.login);
@@ -354,7 +354,7 @@ class LoginController extends GetxController implements LoginService {
 
 
   void clear() {
-    fbaUser.value = null;
+    _fbaUser.value = null;
     authStatus.value = AuthStatus.notDetermined;
     isButtonDisabled.value = false;
   }
@@ -436,12 +436,12 @@ class LoginController extends GetxController implements LoginService {
 
   @override
   Future<void> verifyPhoneNumber(String phoneNumber) async {
-    await auth.verifyPhoneNumber(
+    await _auth.verifyPhoneNumber(
       phoneNumber: phoneNumber,
       timeout: const Duration(seconds: 60),
       verificationCompleted: (fba.PhoneAuthCredential credential) async {
         // Si el número es automáticamente verificado
-        await auth.signInWithCredential(credential);
+        await _auth.signInWithCredential(credential);
       },
       verificationFailed: (fba.FirebaseAuthException e) {
         // Manejar errores, por ejemplo si el formato del número es incorrecto
@@ -470,7 +470,7 @@ class LoginController extends GetxController implements LoginService {
 
     try {
       // Autenticación con las credenciales del código SMS
-      await auth.signInWithCredential(credential);
+      await _auth.signInWithCredential(credential);
       isPhoneAuth = true;
       return true;
     } catch(e) {
@@ -481,8 +481,8 @@ class LoginController extends GetxController implements LoginService {
 
   @override
   Future<void> deleteFbaUser(fba.AuthCredential credential) async {
-    await fbaUser.value?.reauthenticateWithCredential(credential);
-    await fbaUser.value?.delete();
+    await _fbaUser.value?.reauthenticateWithCredential(credential);
+    await _fbaUser.value?.delete();
     await signOut();
   }
 
@@ -499,6 +499,25 @@ class LoginController extends GetxController implements LoginService {
   @override
   void setIsPhoneAuth(bool value) {
     isPhoneAuth = value;
+  }
+
+  @override
+  SignedInWith get signedInWith => _signedInWith;
+
+  @override
+  set signedInWith(SignedInWith signedInWith) {
+    _signedInWith = signedInWith;
+  }
+
+  @override
+  fba.FirebaseAuth get auth => _auth;
+
+  @override
+  fba.User? get fbaUser => _fbaUser.value;
+
+  @override
+  set fbaUser(fba.User? fbaUser) {
+    _fbaUser.value = fbaUser;
   }
 
 }
