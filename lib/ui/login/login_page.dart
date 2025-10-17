@@ -38,7 +38,7 @@ class LoginPage extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: <Widget>[
                   HeaderIntro(title: kDebugMode && !kIsWeb && Platform.isAndroid ? CoreConstants.dev : "",),
-                  AppTheme.heightSpace20,
+                  AppTheme.heightSpace10,
                   Text(AuthTranslationConstants.signIn.tr,
                     style: const TextStyle(
                       color: Colors.white, fontSize: 25.0,

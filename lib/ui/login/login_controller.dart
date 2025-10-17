@@ -6,12 +6,12 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:neom_commons/utils/app_utilities.dart';
-import 'package:neom_commons/utils/constants/app_page_id_constants.dart';
 import 'package:neom_commons/utils/constants/translations/common_translation_constants.dart';
 import 'package:neom_commons/utils/constants/translations/message_translation_constants.dart';
 import 'package:neom_commons/utils/device_utilities.dart';
 import 'package:neom_commons/utils/security_utilities.dart';
 import 'package:neom_core/app_config.dart';
+import 'package:neom_core/app_properties.dart';
 import 'package:neom_core/data/firestore/constants/app_firestore_constants.dart';
 import 'package:neom_core/data/implementations/app_hive_controller.dart';
 import 'package:neom_core/domain/use_cases/login_service.dart';
@@ -30,8 +30,8 @@ class LoginController extends GetxController implements LoginService {
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
 
+  final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
   Rx<AuthStatus> authStatus = AuthStatus.notDetermined.obs;
-  GoogleSignIn _googleSignIn = GoogleSignIn();
 
   //TODO Verify if its not needed
   //final SignInWithApple _appleSignIn = SignInWithApple();
@@ -63,17 +63,15 @@ class LoginController extends GetxController implements LoginService {
     _fbaUser.bindStream(_auth.authStateChanges());
 
     if(kIsWeb) {
-      _googleSignIn = GoogleSignIn(clientId: '444807211272-qlk8fl7dp6lg5d5o7hq6dkv2rj80m8kt.apps.googleusercontent.com');
-    } else {
-      if(Platform.isIOS) {
-
-      }
-    }
-    if(Platform.isIOS && !kIsWeb ) {
-      isIOS13OrHigher = DeviceUtilities.isDeviceSupportedVersion(isIOS: Platform.isIOS);
-    } else if (Platform.isAndroid) {
+      _googleSignIn.initialize(clientId: AppProperties.getWebCliendId());
+    } else if(Platform.isAndroid) {
       AppConfig.logger.t(Platform.version);
+      _googleSignIn.initialize(serverClientId: AppProperties.getServerCliendId());
+    } else if(Platform.isIOS) {
+      isIOS13OrHigher = DeviceUtilities.isDeviceSupportedVersion(isIOS: Platform.isIOS);
+      _googleSignIn.initialize();
     }
+
   }
 
   @override
@@ -152,7 +150,7 @@ class LoginController extends GetxController implements LoginService {
       isLoading.value = false;
     }
 
-    update([AppPageIdConstants.login, AppPageIdConstants.root]);
+    update();
   }
 
   void gotoIntroPage() {
@@ -399,14 +397,11 @@ class LoginController extends GetxController implements LoginService {
 
           break;
         case(LoginMethod.google):
-          GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-          if(googleUser != null) {
-            GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-            credentials = fba.GoogleAuthProvider.credential(
-                idToken: googleAuth.idToken,
-                accessToken: googleAuth.accessToken
-            );
-          }
+          GoogleSignInAccount googleUser = await _googleSignIn.authenticate();
+          GoogleSignInAuthentication googleAuth = googleUser.authentication;
+          credentials = fba.GoogleAuthProvider.credential(
+              idToken: googleAuth.idToken,
+          );
           break;
         case(LoginMethod.spotify):
           break;
