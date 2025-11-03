@@ -22,7 +22,7 @@ class LoginPage extends StatelessWidget {
     return GetBuilder<LoginController>(
       id: AppPageIdConstants.login,
       init: LoginController(),
-      builder: (_) => Scaffold(
+      builder: (controller) => Scaffold(
         backgroundColor: AppColor.main50,
         body: SafeArea(
           child: SingleChildScrollView(
@@ -31,7 +31,7 @@ class LoginPage extends StatelessWidget {
             width: AppTheme.fullWidth(context),
               height: AppTheme.fullHeight(context),
                 decoration: AppTheme.appBoxDecoration,
-              child: Obx(()=> _.isLoading.value ? AppCircularProgressIndicator(
+              child: Obx(()=> controller.isLoading.value ? AppCircularProgressIndicator(
                 subtitle: AuthTranslationConstants.loadingAccount.tr,
                 fontSize: 20,
               ) : Column(
@@ -47,22 +47,22 @@ class LoginPage extends StatelessWidget {
                     ),
                   ),
                   AppTheme.heightSpace10,
-                  buildEmailTF(_),
+                  buildEmailTF(controller),
                   AppTheme.heightSpace10,
-                  buildPasswordTF(_),
-                  buildForgotPasswordBtn(_),
+                  buildPasswordTF(controller),
+                  buildForgotPasswordBtn(controller),
                   SingleChildScrollView(
                       child: Column(
                         children: [
-                          buildLoginBtn(_),
-                          (!kIsWeb && ((Platform.isIOS && !_.isIOS13OrHigher) || (!AppConfig.instance.appInfo.googleLoginEnabled && !kDebugMode)))
+                          buildLoginBtn(controller),
+                          (!kIsWeb && ((Platform.isIOS && !controller.isIOS13OrHigher) || (!AppConfig.instance.appInfo.googleLoginEnabled && !kDebugMode)))
                               ? const SizedBox.shrink() : Column(
                             children: [
                               buildSignInWithText(),
-                              buildSocialBtnRow(_),
+                              buildSocialBtnRow(controller),
                             ],
                           ),
-                          buildSignupBtn(_),
+                          buildSignupBtn(controller),
                         ]
                       )
                   ),

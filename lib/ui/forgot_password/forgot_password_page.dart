@@ -18,7 +18,7 @@ class ForgotPasswordPage extends StatelessWidget {
     return GetBuilder<ForgotPasswordController>(
       id: AppPageIdConstants.forgotPassword,
       init: ForgotPasswordController(),
-      builder: (_) => Scaffold(
+      builder: (controller) => Scaffold(
         extendBodyBehindAppBar: true,
         appBar: AppBarChild(color: Colors.transparent),
         backgroundColor: AppColor.main50,
@@ -35,8 +35,8 @@ class ForgotPasswordPage extends StatelessWidget {
                   margin: const EdgeInsets.symmetric(vertical: 15),
                   decoration: AppTheme.kBoxDecorationStyle,
                   child: TextField(
-                    focusNode: _.focusNode,
-                    controller: _.emailController,
+                    focusNode: controller.focusNode,
+                    controller: controller.emailController,
                     keyboardType: TextInputType.emailAddress,
                     style: const TextStyle(fontStyle: FontStyle.normal,fontWeight: FontWeight.normal),
                     decoration: InputDecoration(
@@ -50,7 +50,7 @@ class ForgotPasswordPage extends StatelessWidget {
                     margin: const EdgeInsets.symmetric(vertical: 15),
                     width: MediaQuery.of(context).size.width/2,
                     child: TextButton(
-                      onPressed: () => _.submitForm(context),
+                      onPressed: () => controller.submitForm(context),
                       style: TextButton.styleFrom(
                         padding: const EdgeInsets.symmetric(horizontal: 30,vertical: 10),
                         backgroundColor: AppColor.getMain(),

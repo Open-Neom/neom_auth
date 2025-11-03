@@ -23,7 +23,7 @@ class SignupPage extends StatelessWidget {
     return GetBuilder<SignUpController>(
       id: AppPageIdConstants.signUp,
       init: SignUpController(),
-      builder: (_) => Scaffold(
+      builder: (controller) => Scaffold(
         extendBodyBehindAppBar: true,
         appBar: AppBarChild(color: Colors.transparent),
         backgroundColor: AppColor.main50,
@@ -40,21 +40,21 @@ class SignupPage extends StatelessWidget {
                   children: <Widget>[
                     buildLabel(context, CommonTranslationConstants.welcomeToApp.tr, AuthTranslationConstants.youWillFindMsg.tr),
                     buildTwoEntryFields(AppTranslationConstants.firstName.tr, AppTranslationConstants.lastName.tr,
-                        firstController: _.firstNameController, secondController: _.lastNameController, fieldsContext: context),
-                    buildEntryField(AppTranslationConstants.username.tr, controller: _.usernameController),
+                        firstController: controller.firstNameController, secondController: controller.lastNameController, fieldsContext: context),
+                    buildEntryField(AppTranslationConstants.username.tr, controller: controller.usernameController),
                     buildEntryField(CommonTranslationConstants.enterEmail.tr,
-                        controller: _.emailController, isEmail: true),
+                        controller: controller.emailController, isEmail: true),
                     buildEntryField(AuthTranslationConstants.enterPassword.tr,
-                        controller: _.passwordController, isPassword: true),
+                        controller: controller.passwordController, isPassword: true),
                     buildEntryField(AuthTranslationConstants.confirmPassword.tr,
-                        controller: _.confirmController, isPassword: true),
+                        controller: controller.confirmController, isPassword: true),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Checkbox(
-                          value: _.agreeTerms.value,
+                          value: controller.agreeTerms.value,
                           onChanged: (value) {
-                            _.setTermsAgreement(value ?? false);
+                            controller.setTermsAgreement(value ?? false);
                           },
                         ),
                         Text(CommonTranslationConstants.iHaveReadAndAccept.tr,
@@ -70,11 +70,11 @@ class SignupPage extends StatelessWidget {
                         ),
                       ],
                     ),
-                    !_.agreeTerms.value ? const SizedBox.shrink() : Container(
+                    !controller.agreeTerms.value ? const SizedBox.shrink() : Container(
                       margin: const EdgeInsets.symmetric(vertical: 15),
                       width: MediaQuery.of(context).size.width/2,
                       child: TextButton(
-                        onPressed: () => _.submit(context),
+                        onPressed: () => controller.submit(context),
                         style: TextButton.styleFrom(
                           padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 10),
                           backgroundColor: AppColor.getMain(),

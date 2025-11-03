@@ -16,7 +16,7 @@ import '../login/login_controller.dart';
 
   bool _rememberMe = false;
 
-  Widget buildEmailTF(LoginController _) {
+  Widget buildEmailTF(LoginController controller) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
@@ -27,7 +27,7 @@ import '../login/login_controller.dart';
           decoration: AppTheme.kBoxDecorationStyle,
           height: 50.0,
           child: TextField(
-            controller: _.emailController,
+            controller: controller.emailController,
             keyboardType: TextInputType.emailAddress,
             style: const TextStyle(
               color: Colors.white,
@@ -49,7 +49,7 @@ import '../login/login_controller.dart';
     );
   }
 
-  Widget buildPasswordTF(LoginController _) {
+  Widget buildPasswordTF(LoginController controller) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
@@ -60,7 +60,7 @@ import '../login/login_controller.dart';
           decoration: AppTheme.kBoxDecorationStyle,
           height: 50.0,
           child: TextField(
-            controller: _.passwordController,
+            controller: controller.passwordController,
             obscureText: true,
             style: const TextStyle(
               color: Colors.white,
@@ -121,15 +121,15 @@ import '../login/login_controller.dart';
     );
   }
 
-  Widget buildLoginBtn(LoginController _) {
+  Widget buildLoginBtn(LoginController controller) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 15.0),
       width: double.infinity,
       child: ElevatedButton(
         onPressed: () async => {
-          if(_.emailController.text.trim().isNotEmpty && _.passwordController.text.trim().isNotEmpty) {
-            if(!_.isButtonDisabled.value) {
-              await _.handleLogin(LoginMethod.email)
+          if(controller.emailController.text.trim().isNotEmpty && controller.passwordController.text.trim().isNotEmpty) {
+            if(!controller.isButtonDisabled.value) {
+              await controller.handleLogin(LoginMethod.email)
             }
           } else {
             Get.snackbar(
@@ -178,17 +178,17 @@ import '../login/login_controller.dart';
     );
   }
 
-  Widget buildSocialBtnRow(LoginController _) {
+  Widget buildSocialBtnRow(LoginController controller) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 10.0),
       child: Row(
-        mainAxisAlignment: (_.isIOS13OrHigher && AppConfig.instance.appInfo.googleLoginEnabled)
+        mainAxisAlignment: (controller.isIOS13OrHigher && AppConfig.instance.appInfo.googleLoginEnabled)
             ? MainAxisAlignment.spaceEvenly : MainAxisAlignment.center,
         children: <Widget>[
-          _.isIOS13OrHigher ? GestureDetector(
+          controller.isIOS13OrHigher ? GestureDetector(
               onTap: () async => {
-                if(!_.isButtonDisabled.value) {
-                  await _.handleLogin(LoginMethod.apple)
+                if(!controller.isButtonDisabled.value) {
+                  await controller.handleLogin(LoginMethod.apple)
                 }
               },
               child: Container(
@@ -215,8 +215,8 @@ import '../login/login_controller.dart';
           (AppConfig.instance.appInfo.googleLoginEnabled || kDebugMode)
               ? TextButton(
             onPressed: () async => {
-              if(!_.isButtonDisabled.value) {
-                await _.handleLogin(LoginMethod.google)
+              if(!controller.isButtonDisabled.value) {
+                await controller.handleLogin(LoginMethod.google)
               }
             },
             child: Container(
@@ -243,10 +243,10 @@ import '../login/login_controller.dart';
     );
   }
 
-  Widget buildSignupBtn(LoginController _) {
+  Widget buildSignupBtn(LoginController controller) {
     return GestureDetector(
       onTap: () => {
-        if(!_.isButtonDisabled.value) Get.toNamed(AppRouteConstants.signup)
+        if(!controller.isButtonDisabled.value) Get.toNamed(AppRouteConstants.signup)
       },
       child: RichText(
         textAlign: TextAlign.center,
