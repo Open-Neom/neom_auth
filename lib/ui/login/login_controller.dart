@@ -52,7 +52,7 @@ class LoginController extends GetxController implements LoginService {
   bool isPhoneAuth = false;
   String phoneVerificationId = '';
 
-  bool isIOS13OrHigher = false;
+  bool isIOS16OrHigher = true;
 
   @override
   void onInit() {
@@ -68,7 +68,7 @@ class LoginController extends GetxController implements LoginService {
       AppConfig.logger.t(Platform.version);
       _googleSignIn.initialize(serverClientId: AppProperties.getServerCliendId());
     } else if(Platform.isIOS) {
-      isIOS13OrHigher = DeviceUtilities.isDeviceSupportedVersion(isIOS: Platform.isIOS);
+      isIOS16OrHigher = DeviceUtilities.isDeviceSupportedVersion(isIOS: Platform.isIOS);
       _googleSignIn.initialize();
     }
 

@@ -182,10 +182,10 @@ import '../login/login_controller.dart';
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 10.0),
       child: Row(
-        mainAxisAlignment: (controller.isIOS13OrHigher && AppConfig.instance.appInfo.googleLoginEnabled)
+        mainAxisAlignment: (controller.isIOS16OrHigher && AppConfig.instance.appInfo.googleLoginEnabled)
             ? MainAxisAlignment.spaceEvenly : MainAxisAlignment.center,
         children: <Widget>[
-          controller.isIOS13OrHigher ? GestureDetector(
+          controller.isIOS16OrHigher ? GestureDetector(
               onTap: () async => {
                 if(!controller.isButtonDisabled.value) {
                   await controller.handleLogin(LoginMethod.apple)

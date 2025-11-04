@@ -25,8 +25,7 @@ class LoginPage extends StatelessWidget {
       builder: (controller) => Scaffold(
         backgroundColor: AppColor.main50,
         body: SafeArea(
-          child: SingleChildScrollView(
-            child: Container(
+          child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 40,),
             width: AppTheme.fullWidth(context),
               height: AppTheme.fullHeight(context),
@@ -34,10 +33,11 @@ class LoginPage extends StatelessWidget {
               child: Obx(()=> controller.isLoading.value ? AppCircularProgressIndicator(
                 subtitle: AuthTranslationConstants.loadingAccount.tr,
                 fontSize: 20,
-              ) : Column(
+              ) : SingleChildScrollView(
+                child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: <Widget>[
-                  HeaderIntro(title: kDebugMode && !kIsWeb && Platform.isAndroid ? CoreConstants.dev : "",),
+                  HeaderIntro(title: kDebugMode ? CoreConstants.dev : "",),
                   AppTheme.heightSpace10,
                   Text(AuthTranslationConstants.signIn.tr,
                     style: const TextStyle(
@@ -55,13 +55,14 @@ class LoginPage extends StatelessWidget {
                       child: Column(
                         children: [
                           buildLoginBtn(controller),
-                          (!kIsWeb && ((Platform.isIOS && !controller.isIOS13OrHigher) || (!AppConfig.instance.appInfo.googleLoginEnabled && !kDebugMode)))
-                              ? const SizedBox.shrink() : Column(
+                          (AppConfig.instance.appInfo.googleLoginEnabled)
+                              && ((Platform.isAndroid) || (Platform.isIOS && controller.isIOS16OrHigher))
+                              ? Column(
                             children: [
                               buildSignInWithText(),
                               buildSocialBtnRow(controller),
                             ],
-                          ),
+                          ) : const SizedBox.shrink(),
                           buildSignupBtn(controller),
                         ]
                       )
