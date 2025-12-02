@@ -14,6 +14,9 @@ import 'package:neom_core/app_config.dart';
 import 'package:neom_core/app_properties.dart';
 import 'package:neom_core/data/firestore/constants/app_firestore_constants.dart';
 import 'package:neom_core/data/implementations/app_hive_controller.dart';
+import 'package:neom_core/domain/model/app_profile.dart';
+import 'package:neom_core/domain/model/app_user.dart';
+import 'package:neom_core/domain/use_cases/audio_handler_service.dart';
 import 'package:neom_core/domain/use_cases/login_service.dart';
 import 'package:neom_core/domain/use_cases/user_service.dart';
 import 'package:neom_core/utils/constants/app_route_constants.dart';
@@ -52,7 +55,7 @@ class LoginController extends GetxController implements LoginService {
   bool isPhoneAuth = false;
   String phoneVerificationId = '';
 
-  bool isIOS16OrHigher = true;
+  bool isIOS16OrHigher = false;
 
   @override
   void onInit() {
@@ -129,6 +132,7 @@ class LoginController extends GetxController implements LoginService {
           authStatus.value = AuthStatus.notLoggedIn;
         } else {
           authStatus.value = AuthStatus.loggedIn;
+          AppConfig.instance.isGuestMode = false;
           await Get.find<AppHiveController>().writeProfileInfo();
         }
 
@@ -333,6 +337,10 @@ class LoginController extends GetxController implements LoginService {
       await _auth.signOut();
       await googleLogout();
       clear();
+      AudioHandlerService audioHandler = Get.find<AudioHandlerService>();
+      if(audioHandler.isPlaying) {
+        audioHandler.stop();
+      }
       Get.offAllNamed(AppRouteConstants.login);
     } catch (e) {
       AppUtilities.showSnackBar(
@@ -513,6 +521,29 @@ class LoginController extends GetxController implements LoginService {
   @override
   set fbaUser(fba.User? fbaUser) {
     _fbaUser.value = fbaUser;
+  }
+
+  @override
+  void loginAsGuest() {
+    AppConfig.logger.i("Entering as Guest");
+    AppConfig.instance.isGuestMode = true;
+    userServiceImpl.user = AppUser();
+    userServiceImpl.profile = AppProfile();
+    Get.offAllNamed(AppRouteConstants.root);
+  }
+
+  void onGuestLoginSuccess() {
+    // Verificamos si venimos redirigidos de una acción protegida
+    if (Get.arguments != null && Get.arguments['nextRoute'] != null) {
+      String nextRoute = Get.arguments['nextRoute'];
+      dynamic nextArgs = Get.arguments['nextArgs'];
+
+      // Vamos directo a la acción que el usuario quería hacer (ej. Crear Evento)
+      Get.offNamed(nextRoute, arguments: nextArgs);
+    } else {
+      // Flujo normal
+      Get.offAllNamed(AppRouteConstants.root);
+    }
   }
 
 }

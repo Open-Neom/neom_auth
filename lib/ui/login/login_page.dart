@@ -3,11 +3,12 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:neom_commons/ui/theme/app_color.dart';
+import 'package:neom_commons/app_flavour.dart';
 import 'package:neom_commons/ui/theme/app_theme.dart';
 import 'package:neom_commons/ui/widgets/app_circular_progress_indicator.dart';
 import 'package:neom_commons/ui/widgets/header_intro.dart';
 import 'package:neom_commons/utils/constants/app_page_id_constants.dart';
+import 'package:neom_commons/utils/constants/translations/app_translation_constants.dart';
 import 'package:neom_core/app_config.dart';
 import 'package:neom_core/utils/constants/core_constants.dart';
 import '../../utils/constants/auth_translation_constants.dart';
@@ -23,10 +24,11 @@ class LoginPage extends StatelessWidget {
       id: AppPageIdConstants.login,
       init: LoginController(),
       builder: (controller) => Scaffold(
-        backgroundColor: AppColor.main50,
+        backgroundColor: AppFlavour.getBackgroundColor(),
         body: SafeArea(
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 40,),
+            alignment: AlignmentGeometry.center,
             width: AppTheme.fullWidth(context),
               height: AppTheme.fullHeight(context),
                 decoration: AppTheme.appBoxDecoration,
@@ -64,6 +66,16 @@ class LoginPage extends StatelessWidget {
                             ],
                           ) : const SizedBox.shrink(),
                           buildSignupBtn(controller),
+                          TextButton(
+                            onPressed: () => controller.loginAsGuest(),
+                            child: Text(
+                              AppTranslationConstants.exploreAsGuest.tr,
+                              style: TextStyle(
+                                  color: Colors.white70,
+                                  decoration: TextDecoration.underline
+                              ),
+                            ),
+                          )
                         ]
                       )
                   ),
