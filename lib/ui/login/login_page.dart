@@ -39,7 +39,7 @@ class LoginPage extends StatelessWidget {
                 child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: <Widget>[
-                  HeaderIntro(title: kDebugMode ? CoreConstants.dev : "",),
+                  HeaderIntro(title: kDebugMode ? CoreConstants.dev : "", showLogo: true,),
                   AppTheme.heightSpace10,
                   Text(AuthTranslationConstants.signIn.tr,
                     style: const TextStyle(

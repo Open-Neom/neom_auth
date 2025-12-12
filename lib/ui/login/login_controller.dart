@@ -95,7 +95,7 @@ class LoginController extends GetxController implements LoginService {
       if(_auth.currentUser == null) {
         authStatus.value = AuthStatus.notLoggedIn;
         _auth = fba.FirebaseAuth.instance;
-      } else if (user == null && _auth.currentUser != null) {
+      } else if(user == null && _auth.currentUser != null) {
         authStatus.value = AuthStatus.notLoggedIn;
         user = _auth.currentUser!;
       } else if(user != null) {
@@ -525,7 +525,7 @@ class LoginController extends GetxController implements LoginService {
 
   @override
   void loginAsGuest() {
-    AppConfig.logger.i("Entering as Guest");
+    AppConfig.logger.d("Entering as Guest");
     AppConfig.instance.isGuestMode = true;
     userServiceImpl.user = AppUser();
     userServiceImpl.profile = AppProfile();
