@@ -1,7 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart' as fba;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
+import 'package:sint/sint.dart';
 import 'package:neom_commons/utils/constants/translations/common_translation_constants.dart';
 import 'package:neom_core/app_config.dart';
 import 'package:neom_core/data/firestore/user_firestore.dart';
@@ -10,7 +10,7 @@ import 'package:neom_core/utils/validator.dart';
 import '../../domain/use_cases/forgot_password_service.dart';
 import '../../utils/constants/auth_translation_constants.dart';
 
-class ForgotPasswordController extends GetxController implements ForgotPasswordService {
+class ForgotPasswordController extends SintController implements ForgotPasswordService {
 
   late FocusNode focusNode;
   final TextEditingController nameController = TextEditingController();
@@ -59,21 +59,21 @@ class ForgotPasswordController extends GetxController implements ForgotPasswordS
       if(validateEmailMsg.isEmpty) {
         await auth.sendPasswordResetEmail(email: email);
       } else {
-        Get.snackbar(CommonTranslationConstants.passwordReset.tr,
+        Sint.snackbar(CommonTranslationConstants.passwordReset.tr,
           validateEmailMsg.tr,
           snackPosition: SnackPosition.bottom,
         );
         return false;
       }
     } catch (e) {
-      Get.snackbar(
+      Sint.snackbar(
         CommonTranslationConstants.passwordReset.tr,
         e.toString(),
         snackPosition: SnackPosition.bottom,);
       return false;
     }
 
-    await Get.toNamed(AppRouteConstants.forgotPasswordSending, arguments: [AppRouteConstants.forgotPassword]);
+    await Sint.toNamed(AppRouteConstants.forgotPasswordSending, arguments: [AppRouteConstants.forgotPassword]);
     return true;
   }
 

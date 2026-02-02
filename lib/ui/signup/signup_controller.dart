@@ -1,7 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
+import 'package:sint/sint.dart';
 import 'package:neom_commons/utils/app_utilities.dart';
 import 'package:neom_commons/utils/constants/translations/message_translation_constants.dart';
 import 'package:neom_core/app_config.dart';
@@ -15,10 +15,10 @@ import 'package:neom_core/utils/validator.dart';
 import '../../domain/use_cases/signup_service.dart';
 import '../../utils/constants/auth_translation_constants.dart';
 
-class SignUpController extends GetxController implements SignUpService {
+class SignUpController extends SintController implements SignUpService {
 
-  final loginServiceImpl = Get.find<LoginService>();
-  final userServiceImpl = Get.find<UserService>();
+  final loginServiceImpl = Sint.find<LoginService>();
+  final userServiceImpl = Sint.find<UserService>();
 
   final TextEditingController firstNameController = TextEditingController();
   final TextEditingController lastNameController = TextEditingController();
@@ -86,17 +86,14 @@ class SignUpController extends GetxController implements SignUpService {
           break;
       }
 
-      Get.snackbar(
-          MessageTranslationConstants.accountSignUp.tr,
-          fbAuthExceptionMsg.tr,
-          snackPosition: SnackPosition.bottom);
-
+      AppUtilities.showSnackBar(
+          title: MessageTranslationConstants.accountSignUp.tr,
+          message: fbAuthExceptionMsg.tr);
       return false;
     } catch (e) {
-      Get.snackbar(
-          MessageTranslationConstants.accountSignUp.tr,
-          e.toString(),
-          snackPosition: SnackPosition.bottom);
+      AppUtilities.showSnackBar(
+          title: MessageTranslationConstants.accountSignUp.tr,
+          message: e.toString());
       return false;
     }
 

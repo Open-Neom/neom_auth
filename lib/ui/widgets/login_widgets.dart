@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
+import 'package:sint/sint.dart';
 import 'package:neom_commons/ui/theme/app_color.dart';
 import 'package:neom_commons/ui/theme/app_theme.dart';
 import 'package:neom_commons/utils/constants/app_assets.dart';
@@ -86,7 +86,7 @@ import '../login/login_controller.dart';
     return Align(
       alignment: Alignment.centerRight,
       child: TextButton(
-        onPressed: () => Get.toNamed(AppRouteConstants.forgotPassword),
+        onPressed: () => Sint.toNamed(AppRouteConstants.forgotPassword),
         style: TextButton.styleFrom(padding: const EdgeInsets.only(right: 0.0)),
         child: Text(AuthTranslationConstants.forgotPassword.tr,
           style: AppTheme.kLabelStyle,
@@ -132,7 +132,7 @@ import '../login/login_controller.dart';
               await controller.handleLogin(LoginMethod.email)
             }
           } else {
-            Get.snackbar(
+            Sint.snackbar(
               MessageTranslationConstants.errorLoginEmail.tr,
               MessageTranslationConstants.pleaseFillSignUpForm.tr,
               snackPosition: SnackPosition.bottom
@@ -246,7 +246,7 @@ import '../login/login_controller.dart';
   Widget buildSignupBtn(LoginController controller) {
     return GestureDetector(
       onTap: () => {
-        if(!controller.isButtonDisabled.value) Get.toNamed(AppRouteConstants.signup)
+        if(!controller.isButtonDisabled.value) Sint.toNamed(AppRouteConstants.signup)
       },
       child: RichText(
         textAlign: TextAlign.center,

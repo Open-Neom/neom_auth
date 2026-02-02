@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:firebase_auth/firebase_auth.dart' as fba;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
+import 'package:sint/sint.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:neom_commons/utils/app_utilities.dart';
 import 'package:neom_commons/utils/constants/translations/common_translation_constants.dart';
@@ -26,9 +26,9 @@ import 'package:neom_core/utils/validator.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import '../../utils/enums/login_method.dart';
 
-class LoginController extends GetxController implements LoginService {
+class LoginController extends SintController implements LoginService {
 
-  final userServiceImpl = Get.find<UserService>();
+  final userServiceImpl = Sint.find<UserService>();
 
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
@@ -61,9 +61,10 @@ class LoginController extends GetxController implements LoginService {
   void onInit() {
     super.onInit();
     AppConfig.logger.t("onInit Login Controller");
-    _fbaUser.value = _auth.currentUser;
-    ever<fba.User?>(_fbaUser, handleAuthChanged);
     _fbaUser.bindStream(_auth.authStateChanges());
+    //_fbaUser.value = _auth.currentUser;
+    ///DEPRECATED ever<fba.User?>(_fbaUser, handleAuthChanged);
+    _fbaUser.listen(handleAuthChanged);
 
     if(kIsWeb) {
       _googleSignIn.initialize(clientId: AppProperties.getWebCliendId());
@@ -84,9 +85,18 @@ class LoginController extends GetxController implements LoginService {
     isLoading.value = false;
   }
 
+  bool _isProcessingAuth = false;
+
   @override
   Future<void> handleAuthChanged(fba.User? user) async {
-    AppConfig.logger.d("handleAuthChanged");
+
+    // Si ya estamos procesando un cambio de auth, ignoramos los disparos duplicados
+    if (_isProcessingAuth) {
+      AppConfig.logger.d("handleAuthChanged ignorado: ya se está procesando uno.");
+      return;
+    }
+    _isProcessingAuth = true; // Bloqueamos
+    AppConfig.logger.d("handleAuthChanged - Procesando para user: ${user?.uid}");
     authStatus.value = AuthStatus.waiting;
 
     if(isPhoneAuth) return;
@@ -133,14 +143,14 @@ class LoginController extends GetxController implements LoginService {
         } else {
           authStatus.value = AuthStatus.loggedIn;
           AppConfig.instance.isGuestMode = false;
-          await Get.find<AppHiveController>().writeProfileInfo();
+          await Sint.find<AppHiveController>().writeProfileInfo();
         }
 
         if(userServiceImpl.isNewUser && userServiceImpl.user.id.isNotEmpty) {
           gotoIntroPage();
-        } else {
+        } else if (authStatus.value == AuthStatus.loggedIn) {
           AppConfig.logger.i("User found for $_userId. Redirecting to Root Page");
-          Get.offAllNamed(AppRouteConstants.root);
+          Sint.offAllNamed(AppRouteConstants.root);
         }
       }
     } catch (e) {
@@ -149,9 +159,11 @@ class LoginController extends GetxController implements LoginService {
         title: MessageTranslationConstants.errorHandlingAuth,
         message: e.toString()
       );
-      Get.offAllNamed(AppRouteConstants.root);
+      Sint.offAllNamed(AppRouteConstants.root);
     } finally {
       isLoading.value = false;
+      _isProcessingAuth = false; // LIBERAMOS el semáforo
+      update();
     }
 
     update();
@@ -160,7 +172,7 @@ class LoginController extends GetxController implements LoginService {
   void gotoIntroPage() {
     AppConfig.logger.i("New User found for $_userId. Redirecting to Intro Page");
     authStatus.value = AuthStatus.loggedIn;
-    Get.toNamed(AppRouteConstants.introRequiredPermissions);
+    Sint.toNamed(AppRouteConstants.introRequiredPermissions);
   }
 
   Future<void> handleLogin(LoginMethod logMethod) async {
@@ -337,11 +349,11 @@ class LoginController extends GetxController implements LoginService {
       await _auth.signOut();
       await googleLogout();
       clear();
-      AudioHandlerService audioHandler = Get.find<AudioHandlerService>();
+      AudioHandlerService audioHandler = Sint.find<AudioHandlerService>();
       if(audioHandler.isPlaying) {
         audioHandler.stop();
       }
-      Get.offAllNamed(AppRouteConstants.login);
+      Sint.offAllNamed(AppRouteConstants.login);
     } catch (e) {
       AppUtilities.showSnackBar(
         title: MessageTranslationConstants.errorSigningOut.tr,
@@ -529,20 +541,20 @@ class LoginController extends GetxController implements LoginService {
     AppConfig.instance.isGuestMode = true;
     userServiceImpl.user = AppUser();
     userServiceImpl.profile = AppProfile();
-    Get.offAllNamed(AppRouteConstants.root);
+    Sint.offAllNamed(AppRouteConstants.root);
   }
 
   void onGuestLoginSuccess() {
     // Verificamos si venimos redirigidos de una acción protegida
-    if (Get.arguments != null && Get.arguments['nextRoute'] != null) {
-      String nextRoute = Get.arguments['nextRoute'];
-      dynamic nextArgs = Get.arguments['nextArgs'];
+    if (Sint.arguments != null && Sint.arguments['nextRoute'] != null) {
+      String nextRoute = Sint.arguments['nextRoute'];
+      dynamic nextArgs = Sint.arguments['nextArgs'];
 
       // Vamos directo a la acción que el usuario quería hacer (ej. Crear Evento)
-      Get.offNamed(nextRoute, arguments: nextArgs);
+      Sint.offNamed(nextRoute, arguments: nextArgs);
     } else {
       // Flujo normal
-      Get.offAllNamed(AppRouteConstants.root);
+      Sint.offAllNamed(AppRouteConstants.root);
     }
   }
 
