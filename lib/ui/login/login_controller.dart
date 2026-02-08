@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:sint/sint.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:neom_commons/utils/app_utilities.dart';
-import 'package:neom_commons/utils/constants/translations/common_translation_constants.dart';
 import 'package:neom_commons/utils/constants/translations/message_translation_constants.dart';
 import 'package:neom_commons/utils/device_utilities.dart';
 import 'package:neom_commons/utils/security_utilities.dart';
@@ -22,8 +21,9 @@ import 'package:neom_core/domain/use_cases/user_service.dart';
 import 'package:neom_core/utils/constants/app_route_constants.dart';
 import 'package:neom_core/utils/enums/auth_status.dart';
 import 'package:neom_core/utils/enums/signed_in_with.dart';
-import 'package:neom_core/utils/validator.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
+
+import '../../utils/constants/auth_translation_constants.dart';
 import '../../utils/enums/login_method.dart';
 
 class LoginController extends SintController implements LoginService {
@@ -35,9 +35,6 @@ class LoginController extends SintController implements LoginService {
 
   final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
   Rx<AuthStatus> authStatus = AuthStatus.notDetermined.obs;
-
-  //TODO Verify if its not needed
-  //final SignInWithApple _appleSignIn = SignInWithApple();
 
   String _userId = "";
   final String _fbAccessToken = "";
@@ -56,6 +53,7 @@ class LoginController extends SintController implements LoginService {
   String phoneVerificationId = '';
 
   bool isIOS16OrHigher = false;
+  bool _isProcessingAuth = false;
 
   @override
   void onInit() {
@@ -85,7 +83,14 @@ class LoginController extends SintController implements LoginService {
     isLoading.value = false;
   }
 
-  bool _isProcessingAuth = false;
+  @override
+  void onClose() {
+    // NOTE: Do NOT dispose TextEditingControllers here.
+    // SintBuilder manages the controller lifecycle and the widget may still
+    // be rendering when onClose is called during navigation (offAllNamed).
+    // The controllers will be garbage collected when the controller is disposed.
+    super.onClose();
+  }
 
   @override
   Future<void> handleAuthChanged(fba.User? user) async {
@@ -110,11 +115,13 @@ class LoginController extends SintController implements LoginService {
         user = _auth.currentUser!;
       } else if(user != null) {
         if(user.providerData.isNotEmpty) {
-          _userId = user.providerData.first.uid!;
-          if(Validator.isEmail(_userId) || (user.providerData.first.email?.isNotEmpty ?? false)) {
-            String email = Validator.isEmail(_userId) ? _userId : user.providerData.first.email ?? '';
+          // Priorizar email sobre providerData.uid ya que los userId modernos son emails
+          String? email = user.providerData.first.email ?? user.email;
+          if(email?.isNotEmpty ?? false) {
+            _userId = email!;
             await userServiceImpl.setUserByEmail(email);
-          } else if(_userId.isNotEmpty) {
+          } else {
+            _userId = user.providerData.first.uid!;
             await userServiceImpl.setUserById(_userId);
           }
         }
@@ -179,8 +186,6 @@ class LoginController extends SintController implements LoginService {
 
     isButtonDisabled.value = true;
     isLoading.value = true;
-    // update([AppPageIdConstants.login]);
-
     loginMethod = logMethod;
 
     try {
@@ -375,6 +380,11 @@ class LoginController extends SintController implements LoginService {
     _fbaUser.value = null;
     authStatus.value = AuthStatus.notDetermined;
     isButtonDisabled.value = false;
+
+    // SECURITY: Clear sensitive data from text controllers on logout
+    emailController.clear();
+    passwordController.clear();
+    credentials = null;
   }
 
 
@@ -417,8 +427,19 @@ class LoginController extends SintController implements LoginService {
 
           break;
         case(LoginMethod.google):
-          GoogleSignInAccount googleUser = await _googleSignIn.authenticate();
-          GoogleSignInAuthentication googleAuth = googleUser.authentication;
+          // FIXED: Added null safety checks for GoogleSignIn
+          final GoogleSignInAccount? googleUser = await _googleSignIn.authenticate();
+          if (googleUser == null) {
+            AppConfig.logger.w("Google Sign-In was cancelled by user");
+            credentials = null;
+            break;
+          }
+          final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+          if (googleAuth.idToken == null) {
+            AppConfig.logger.e("Google Sign-In failed: No idToken received");
+            credentials = null;
+            break;
+          }
           credentials = fba.GoogleAuthProvider.credential(
               idToken: googleAuth.idToken,
           );
@@ -429,10 +450,22 @@ class LoginController extends SintController implements LoginService {
           await signOut();
           break;
       }
+    } on GoogleSignInException catch (e) {
+      // Handle Google Sign-In specific exceptions
+      if (e.code.name == 'canceled') {
+        // User cancelled the sign-in, just log it - no need to show error
+        AppConfig.logger.i("Google Sign-In cancelled by user");
+      } else {
+        AppConfig.logger.e("Google Sign-In error: ${e.code.name} - ${e.description}");
+        AppUtilities.showSnackBar(
+          title: AuthTranslationConstants.loginError.tr,
+          message: e.description ?? AuthTranslationConstants.loginFailed.tr,
+        );
+      }
     } catch (e) {
       AppConfig.logger.e(e.toString());
       AppUtilities.showSnackBar(
-        title: CommonTranslationConstants.underConstruction.tr,
+        title: AuthTranslationConstants.loginError.tr,
         message: e.toString(),
       );
     }

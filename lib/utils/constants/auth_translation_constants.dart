@@ -11,4 +11,11 @@ class AuthTranslationConstants {
   static const String signUp = 'signUp';
   static const String somewhereUniverse = 'somewhereUniverse';
   static const String youWillFindMsg = 'youWillFindMsg';
+
+  // Account signup
+  static const String accountSignUp = 'accountSignUp';
+
+  // Login errors
+  static const String loginError = 'loginError';
+  static const String loginFailed = 'loginFailed';
 }

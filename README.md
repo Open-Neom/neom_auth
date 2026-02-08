@@ -1,4 +1,8 @@
 # neom_auth
+
+[![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](https://github.com/Open-Neom/neom_auth)
+[![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
+
 neom_auth is a fundamental module within the Open Neom ecosystem,
 exclusively responsible for handling all user authentication processes.
 It provides a secure, robust, and user-friendly gateway for users to access the platform,
