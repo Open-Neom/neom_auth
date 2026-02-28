@@ -1,6 +1,5 @@
-import 'dart:io';
-
 import 'package:firebase_auth/firebase_auth.dart' as fba;
+import 'package:neom_core/utils/platform/core_io.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:sint/sint.dart';
@@ -52,7 +51,7 @@ class LoginController extends SintController implements LoginService {
   bool isPhoneAuth = false;
   String phoneVerificationId = '';
 
-  bool isIOS16OrHigher = false;
+  bool isAppleSignInAvailable = false;
   bool _isProcessingAuth = false;
 
   @override
@@ -66,12 +65,16 @@ class LoginController extends SintController implements LoginService {
 
     if(kIsWeb) {
       _googleSignIn.initialize(clientId: AppProperties.getWebCliendId());
+      isAppleSignInAvailable = true;
     } else if(Platform.isAndroid) {
       AppConfig.logger.t(Platform.version);
       _googleSignIn.initialize(serverClientId: AppProperties.getServerCliendId());
     } else if(Platform.isIOS) {
-      isIOS16OrHigher = DeviceUtilities.isDeviceSupportedVersion(isIOS: Platform.isIOS);
+      isAppleSignInAvailable = DeviceUtilities.isDeviceSupportedVersion(isIOS: Platform.isIOS);
       _googleSignIn.initialize();
+    } else if(Platform.isMacOS) {
+      isAppleSignInAvailable = true;
+      _googleSignIn.initialize(clientId: AppProperties.getWebCliendId());
     }
 
   }
@@ -273,13 +276,25 @@ class LoginController extends SintController implements LoginService {
     AppConfig.logger.d("Entering Logging Method with Apple Account");
 
     try {
-      await setAuthCredentials();
-
-      if(credentials != null) {
-        fba.UserCredential userCredential = await _auth.signInWithCredential(credentials!);
+      if (kIsWeb) {
+        // Web: use Firebase Auth signInWithPopup directly
+        // (sign_in_with_apple has JS interop issues on web)
+        final appleProvider = fba.OAuthProvider('apple.com');
+        appleProvider.addScope('email');
+        appleProvider.addScope('name');
+        final userCredential = await _auth.signInWithPopup(appleProvider);
         _fbaUser.value = userCredential.user;
         authStatus.value = AuthStatus.loggedIn;
         signedInWith = SignedInWith.apple;
+      } else {
+        await setAuthCredentials();
+
+        if(credentials != null) {
+          fba.UserCredential userCredential = await _auth.signInWithCredential(credentials!);
+          _fbaUser.value = userCredential.user;
+          authStatus.value = AuthStatus.loggedIn;
+          signedInWith = SignedInWith.apple;
+        }
       }
 
     } on SignInWithAppleAuthorizationException catch (e) {
@@ -317,12 +332,22 @@ class LoginController extends SintController implements LoginService {
     AppConfig.logger.i("Entering Logging Method with Google Account");
 
     try {
-       await setAuthCredentials();
-
-      if(credentials != null) {
-        _fbaUser.value = (await _auth.signInWithCredential(credentials!)).user;
+      if (kIsWeb) {
+        // Web: use Firebase Auth signInWithPopup directly
+        // (google_sign_in.authenticate() is not supported on web)
+        final googleProvider = fba.GoogleAuthProvider();
+        final userCredential = await _auth.signInWithPopup(googleProvider);
+        _fbaUser.value = userCredential.user;
         authStatus.value = AuthStatus.loggedIn;
         signedInWith = SignedInWith.google;
+      } else {
+        await setAuthCredentials();
+
+        if(credentials != null) {
+          _fbaUser.value = (await _auth.signInWithCredential(credentials!)).user;
+          authStatus.value = AuthStatus.loggedIn;
+          signedInWith = SignedInWith.google;
+        }
       }
     } catch (e) {
       _fbaUser.value = null;
@@ -354,9 +379,11 @@ class LoginController extends SintController implements LoginService {
       await _auth.signOut();
       await googleLogout();
       clear();
-      AudioHandlerService audioHandler = Sint.find<AudioHandlerService>();
-      if(audioHandler.isPlaying) {
-        audioHandler.stop();
+      if(Sint.isRegistered<AudioHandlerService>()) {
+        AudioHandlerService audioHandler = Sint.find<AudioHandlerService>();
+        if(audioHandler.isPlaying) {
+          audioHandler.stop();
+        }
       }
       Sint.offAllNamed(AppRouteConstants.login);
     } catch (e) {
