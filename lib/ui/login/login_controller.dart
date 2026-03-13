@@ -9,7 +9,7 @@ import 'package:neom_commons/utils/constants/translations/message_translation_co
 import 'package:neom_commons/utils/device_utilities.dart';
 import 'package:neom_commons/utils/security_utilities.dart';
 import 'package:neom_core/app_config.dart';
-import 'package:neom_core/app_properties.dart';
+import 'package:neom_core/cloud_properties.dart';
 import 'package:neom_core/data/firestore/constants/app_firestore_constants.dart';
 import 'package:neom_core/data/implementations/app_hive_controller.dart';
 import 'package:neom_core/domain/model/app_profile.dart';
@@ -31,6 +31,9 @@ class LoginController extends SintController implements LoginService {
 
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
+
+  final FocusNode emailFocusNode = FocusNode();
+  final FocusNode passwordFocusNode = FocusNode();
 
   final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
   Rx<AuthStatus> authStatus = AuthStatus.notDetermined.obs;
@@ -64,17 +67,18 @@ class LoginController extends SintController implements LoginService {
     _fbaUser.listen(handleAuthChanged);
 
     if(kIsWeb) {
-      _googleSignIn.initialize(clientId: AppProperties.getWebCliendId());
+      _googleSignIn.initialize(clientId: CloudProperties.getWebCliendId());
       isAppleSignInAvailable = true;
+      _checkRedirectResult();
     } else if(Platform.isAndroid) {
       AppConfig.logger.t(Platform.version);
-      _googleSignIn.initialize(serverClientId: AppProperties.getServerCliendId());
+      _googleSignIn.initialize(serverClientId: CloudProperties.getServerCliendId());
     } else if(Platform.isIOS) {
       isAppleSignInAvailable = DeviceUtilities.isDeviceSupportedVersion(isIOS: Platform.isIOS);
       _googleSignIn.initialize();
     } else if(Platform.isMacOS) {
       isAppleSignInAvailable = true;
-      _googleSignIn.initialize(clientId: AppProperties.getWebCliendId());
+      _googleSignIn.initialize(clientId: CloudProperties.getWebCliendId());
     }
 
   }
@@ -93,6 +97,30 @@ class LoginController extends SintController implements LoginService {
     // be rendering when onClose is called during navigation (offAllNamed).
     // The controllers will be garbage collected when the controller is disposed.
     super.onClose();
+  }
+
+  /// Checks for pending OAuth redirect results (used by Safari fallback).
+  /// When signInWithPopup fails (Safari ITP blocks popups), we fall back to
+  /// signInWithRedirect. On page reload, this picks up the redirect result.
+  Future<void> _checkRedirectResult() async {
+    try {
+      final result = await _auth.getRedirectResult();
+      if (result.user != null) {
+        AppConfig.logger.i('OAuth redirect result received for: ${result.user?.email}');
+        _fbaUser.value = result.user;
+        authStatus.value = AuthStatus.loggedIn;
+
+        // Determine sign-in provider
+        final providerId = result.credential?.providerId ?? '';
+        if (providerId.contains('google')) {
+          signedInWith = SignedInWith.google;
+        } else if (providerId.contains('apple')) {
+          signedInWith = SignedInWith.apple;
+        }
+      }
+    } catch (e) {
+      AppConfig.logger.e('getRedirectResult error: $e');
+    }
   }
 
   @override
@@ -277,15 +305,14 @@ class LoginController extends SintController implements LoginService {
 
     try {
       if (kIsWeb) {
-        // Web: use Firebase Auth signInWithPopup directly
-        // (sign_in_with_apple has JS interop issues on web)
+        // Web: use signInWithRedirect (works on all browsers including Safari).
+        // signInWithPopup fails on Safari due to ITP blocking third-party cookies.
         final appleProvider = fba.OAuthProvider('apple.com');
         appleProvider.addScope('email');
         appleProvider.addScope('name');
-        final userCredential = await _auth.signInWithPopup(appleProvider);
-        _fbaUser.value = userCredential.user;
-        authStatus.value = AuthStatus.loggedIn;
-        signedInWith = SignedInWith.apple;
+        AppConfig.logger.i('Web: using signInWithRedirect for Apple');
+        await _auth.signInWithRedirect(appleProvider);
+        // Page will reload — getRedirectResult() in onInit handles the result
       } else {
         await setAuthCredentials();
 
@@ -333,13 +360,12 @@ class LoginController extends SintController implements LoginService {
 
     try {
       if (kIsWeb) {
-        // Web: use Firebase Auth signInWithPopup directly
-        // (google_sign_in.authenticate() is not supported on web)
+        // Web: use signInWithRedirect (works on all browsers including Safari).
+        // signInWithPopup fails on Safari due to ITP blocking third-party cookies.
         final googleProvider = fba.GoogleAuthProvider();
-        final userCredential = await _auth.signInWithPopup(googleProvider);
-        _fbaUser.value = userCredential.user;
-        authStatus.value = AuthStatus.loggedIn;
-        signedInWith = SignedInWith.google;
+        AppConfig.logger.i('Web: using signInWithRedirect for Google');
+        await _auth.signInWithRedirect(googleProvider);
+        // Page will reload — getRedirectResult() in onInit handles the result
       } else {
         await setAuthCredentials();
 

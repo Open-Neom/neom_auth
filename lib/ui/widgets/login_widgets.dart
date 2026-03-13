@@ -28,7 +28,10 @@ import '../login/login_controller.dart';
           height: 50.0,
           child: TextField(
             controller: controller.emailController,
+            focusNode: controller.emailFocusNode,
             keyboardType: TextInputType.emailAddress,
+            textInputAction: TextInputAction.next,
+            onSubmitted: (_) => controller.passwordFocusNode.requestFocus(),
             style: const TextStyle(
               color: Colors.white,
               fontFamily: AppTheme.fontFamily,
@@ -61,7 +64,16 @@ import '../login/login_controller.dart';
           height: 50.0,
           child: TextField(
             controller: controller.passwordController,
+            focusNode: controller.passwordFocusNode,
             obscureText: true,
+            textInputAction: TextInputAction.done,
+            onSubmitted: (_) {
+              if (controller.emailController.text.trim().isNotEmpty
+                  && controller.passwordController.text.trim().isNotEmpty
+                  && !controller.isButtonDisabled.value) {
+                controller.handleLogin(LoginMethod.email);
+              }
+            },
             style: const TextStyle(
               color: Colors.white,
               fontFamily: AppTheme.fontFamily,
@@ -182,10 +194,10 @@ import '../login/login_controller.dart';
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 10.0),
       child: Row(
-        mainAxisAlignment: (controller.isIOS16OrHigher && AppConfig.instance.appInfo.googleLoginEnabled)
+        mainAxisAlignment: (controller.isAppleSignInAvailable && AppConfig.instance.appInfo.googleLoginEnabled)
             ? MainAxisAlignment.spaceEvenly : MainAxisAlignment.center,
         children: <Widget>[
-          controller.isIOS16OrHigher ? GestureDetector(
+          controller.isAppleSignInAvailable ? GestureDetector(
               onTap: () async => {
                 if(!controller.isButtonDisabled.value) {
                   await controller.handleLogin(LoginMethod.apple)

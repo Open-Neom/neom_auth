@@ -27,6 +27,14 @@ class SignUpController extends SintController implements SignUpService {
   final TextEditingController passwordController = TextEditingController();
   final TextEditingController confirmController = TextEditingController();
 
+  // FocusNodes for Tab navigation (web)
+  final FocusNode firstNameFocus = FocusNode();
+  final FocusNode lastNameFocus = FocusNode();
+  final FocusNode usernameFocus = FocusNode();
+  final FocusNode emailFocus = FocusNode();
+  final FocusNode passwordFocus = FocusNode();
+  final FocusNode confirmFocus = FocusNode();
+
   final RxBool agreeTerms = false.obs;
   final RxBool isLoading = true.obs;
 
@@ -51,6 +59,12 @@ class SignUpController extends SintController implements SignUpService {
     emailController.dispose();
     passwordController.dispose();
     confirmController.dispose();
+    firstNameFocus.dispose();
+    lastNameFocus.dispose();
+    usernameFocus.dispose();
+    emailFocus.dispose();
+    passwordFocus.dispose();
+    confirmFocus.dispose();
     super.dispose();
   }
 
