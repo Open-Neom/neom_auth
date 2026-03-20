@@ -5,6 +5,7 @@ import 'package:sint/sint.dart';
 import 'package:neom_commons/utils/app_utilities.dart';
 import 'package:neom_commons/utils/constants/translations/message_translation_constants.dart';
 import 'package:neom_core/app_config.dart';
+import 'package:neom_core/utils/neom_error_logger.dart';
 import 'package:neom_core/data/firestore/constants/app_firestore_constants.dart';
 import 'package:neom_core/data/firestore/user_firestore.dart';
 import 'package:neom_core/domain/model/app_user.dart';
@@ -128,8 +129,8 @@ class SignUpController extends SintController implements SignUpService {
         id: emailController.text.toLowerCase().trim(),
         password: passwordController.text.trim(),
       );
-    } catch (e) {
-      AppConfig.logger.e(e.toString());
+    } catch (e, st) {
+      NeomErrorLogger.recordError(e, st, module: 'neom_auth', operation: 'setUserFromSignUp');
     }
 
     AppConfig.logger.d("User Info set: ${userServiceImpl.user.toString()}");
@@ -184,8 +185,8 @@ class SignUpController extends SintController implements SignUpService {
 
     try {
       agreeTerms.value = agree;
-    } catch (e) {
-      AppConfig.logger.e(e.toString());
+    } catch (e, st) {
+      NeomErrorLogger.recordError(e, st, module: 'neom_auth', operation: 'setTermsAgreement');
     }
 
   }

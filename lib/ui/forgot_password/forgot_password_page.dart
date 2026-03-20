@@ -4,7 +4,6 @@ import 'package:sint/sint.dart';
 import 'package:neom_commons/app_flavour.dart';
 import 'package:neom_commons/ui/theme/app_color.dart';
 import 'package:neom_commons/ui/theme/app_theme.dart';
-import 'package:neom_commons/ui/widgets/appbar_child.dart';
 import 'package:neom_commons/ui/widgets/core_widgets.dart';
 import 'package:neom_commons/utils/constants/app_page_id_constants.dart';
 import 'package:neom_commons/utils/constants/translations/app_translation_constants.dart';
@@ -211,7 +210,7 @@ class ForgotPasswordPage extends StatelessWidget {
   Widget _buildMobileForgotPassword(BuildContext context, ForgotPasswordController controller) {
     return Scaffold(
       extendBodyBehindAppBar: true,
-      appBar: AppBarChild(color: Colors.transparent),
+      appBar: SintAppBar(backgroundColor: Colors.transparent),
       backgroundColor: AppColor.scaffold,
       body: Container(
         decoration: AppTheme.appBoxDecoration,

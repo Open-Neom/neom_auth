@@ -9,6 +9,8 @@ import 'package:neom_commons/utils/constants/translations/message_translation_co
 import 'package:neom_commons/utils/device_utilities.dart';
 import 'package:neom_commons/utils/security_utilities.dart';
 import 'package:neom_core/app_config.dart';
+import 'package:neom_core/utils/neom_error_logger.dart';
+import 'package:neom_core/utils/neom_flow_tracker.dart';
 import 'package:neom_core/cloud_properties.dart';
 import 'package:neom_core/data/firestore/constants/app_firestore_constants.dart';
 import 'package:neom_core/data/implementations/app_hive_controller.dart';
@@ -118,8 +120,8 @@ class LoginController extends SintController implements LoginService {
           signedInWith = SignedInWith.apple;
         }
       }
-    } catch (e) {
-      AppConfig.logger.e('getRedirectResult error: $e');
+    } catch (e, st) {
+      NeomErrorLogger.recordError(e, st, module: 'neom_auth', operation: '_checkRedirectResult');
     }
   }
 
@@ -133,6 +135,7 @@ class LoginController extends SintController implements LoginService {
     }
     _isProcessingAuth = true; // Bloqueamos
     AppConfig.logger.d("handleAuthChanged - Procesando para user: ${user?.uid}");
+    NeomFlowTracker.startFlow('login');
     authStatus.value = AuthStatus.waiting;
 
     if(isPhoneAuth) return;
@@ -185,14 +188,19 @@ class LoginController extends SintController implements LoginService {
         }
 
         if(userServiceImpl.isNewUser && userServiceImpl.user.id.isNotEmpty) {
+          NeomFlowTracker.endFlow('login');
+          NeomFlowTracker.startFlow('registration');
           gotoIntroPage();
         } else if (authStatus.value == AuthStatus.loggedIn) {
+          NeomFlowTracker.setUserId(userServiceImpl.user.id);
+          NeomFlowTracker.endFlow('login');
           AppConfig.logger.i("User found for $_userId. Redirecting to Root Page");
           Sint.offAllNamed(AppRouteConstants.root);
         }
       }
-    } catch (e) {
-      AppConfig.logger.e(e.toString());
+    } catch (e, st) {
+      NeomFlowTracker.endFlow('login', success: false);
+      NeomErrorLogger.recordError(e, st, module: 'neom_auth', operation: 'handleAuthChanged');
       AppUtilities.showSnackBar(
         title: MessageTranslationConstants.errorHandlingAuth,
         message: e.toString()
@@ -237,8 +245,8 @@ class LoginController extends SintController implements LoginService {
         case LoginMethod.notDetermined:
           break;
       }
-    } catch (e) {
-      AppConfig.logger.e(e.toString());
+    } catch (e, st) {
+      NeomErrorLogger.recordError(e, st, module: 'neom_auth', operation: 'handleLogin');
       isLoading.value = false;
     }
     isButtonDisabled.value = false;
@@ -260,8 +268,8 @@ class LoginController extends SintController implements LoginService {
          authStatus.value = AuthStatus.loggedIn;
          signedInWith = SignedInWith.email;
        }
-    } on fba.FirebaseAuthException catch (e) {
-      AppConfig.logger.e(e.toString());
+    } on fba.FirebaseAuthException catch (e, st) {
+      NeomErrorLogger.recordError(e, st, module: 'neom_auth', operation: 'emailLogin');
 
       String errorMsg = "";
       switch (e.code) {
@@ -284,8 +292,8 @@ class LoginController extends SintController implements LoginService {
           title: MessageTranslationConstants.errorLoginEmail.tr,
           message: errorMsg.tr
       );
-    } catch (e) {
-      AppConfig.logger.e(e.toString());
+    } catch (e, st) {
+      NeomErrorLogger.recordError(e, st, module: 'neom_auth', operation: 'emailLogin');
       AppUtilities.showSnackBar(
           title: MessageTranslationConstants.errorLoginEmail.tr,
           message: e.toString(),
@@ -305,14 +313,22 @@ class LoginController extends SintController implements LoginService {
 
     try {
       if (kIsWeb) {
-        // Web: use signInWithRedirect (works on all browsers including Safari).
-        // signInWithPopup fails on Safari due to ITP blocking third-party cookies.
+        // Web: try signInWithPopup first, fallback to signInWithRedirect for Safari.
         final appleProvider = fba.OAuthProvider('apple.com');
         appleProvider.addScope('email');
         appleProvider.addScope('name');
-        AppConfig.logger.i('Web: using signInWithRedirect for Apple');
-        await _auth.signInWithRedirect(appleProvider);
-        // Page will reload — getRedirectResult() in onInit handles the result
+        try {
+          AppConfig.logger.i('Web: trying signInWithPopup for Apple');
+          final result = await _auth.signInWithPopup(appleProvider);
+          if (result.user != null) {
+            _fbaUser.value = result.user;
+            authStatus.value = AuthStatus.loggedIn;
+            signedInWith = SignedInWith.apple;
+          }
+        } catch (popupError) {
+          AppConfig.logger.w('signInWithPopup failed for Apple, falling back to signInWithRedirect: $popupError');
+          await _auth.signInWithRedirect(appleProvider);
+        }
       } else {
         await setAuthCredentials();
 
@@ -324,9 +340,9 @@ class LoginController extends SintController implements LoginService {
         }
       }
 
-    } on SignInWithAppleAuthorizationException catch (e) {
+    } on SignInWithAppleAuthorizationException catch (e, st) {
 
-      AppConfig.logger.e(e.toString());
+      NeomErrorLogger.recordError(e, st, module: 'neom_auth', operation: 'appleLogin');
       _fbaUser.value = null;
       authStatus.value = AuthStatus.notLoggedIn;
 
@@ -337,10 +353,10 @@ class LoginController extends SintController implements LoginService {
         );
       }
 
-    } catch (e) {
+    } catch (e, st) {
       _fbaUser.value = null;
       authStatus.value = AuthStatus.notLoggedIn;
-      AppConfig.logger.e(e.toString());
+      NeomErrorLogger.recordError(e, st, module: 'neom_auth', operation: 'appleLogin');
 
       AppUtilities.showSnackBar(
         title: MessageTranslationConstants.errorLoginApple.tr,
@@ -360,12 +376,23 @@ class LoginController extends SintController implements LoginService {
 
     try {
       if (kIsWeb) {
-        // Web: use signInWithRedirect (works on all browsers including Safari).
-        // signInWithPopup fails on Safari due to ITP blocking third-party cookies.
+        // Web: try signInWithPopup first (works in Chrome, Edge, Firefox).
+        // Falls back to signInWithRedirect for Safari (ITP blocks popups).
         final googleProvider = fba.GoogleAuthProvider();
-        AppConfig.logger.i('Web: using signInWithRedirect for Google');
-        await _auth.signInWithRedirect(googleProvider);
-        // Page will reload — getRedirectResult() in onInit handles the result
+        try {
+          AppConfig.logger.i('Web: trying signInWithPopup for Google');
+          final result = await _auth.signInWithPopup(googleProvider);
+          if (result.user != null) {
+            _fbaUser.value = result.user;
+            authStatus.value = AuthStatus.loggedIn;
+            signedInWith = SignedInWith.google;
+          }
+        } catch (popupError) {
+          // Popup blocked (Safari ITP) or user closed popup — try redirect
+          AppConfig.logger.w('signInWithPopup failed, falling back to signInWithRedirect: $popupError');
+          await _auth.signInWithRedirect(googleProvider);
+          // Page will reload — getRedirectResult() in onInit handles the result
+        }
       } else {
         await setAuthCredentials();
 
@@ -375,10 +402,10 @@ class LoginController extends SintController implements LoginService {
           signedInWith = SignedInWith.google;
         }
       }
-    } catch (e) {
+    } catch (e, st) {
       _fbaUser.value = null;
       authStatus.value = AuthStatus.notLoggedIn;
-      AppConfig.logger.e(e.toString());
+      NeomErrorLogger.recordError(e, st, module: 'neom_auth', operation: 'googleLogin');
 
       AppUtilities.showSnackBar(
         title: MessageTranslationConstants.errorLoginGoogle.tr,
@@ -393,8 +420,8 @@ class LoginController extends SintController implements LoginService {
   Future<void> googleLogout() async {
     try {
       await _googleSignIn.signOut();
-    } catch (e){
-      AppConfig.logger.e(e.toString());
+    } catch (e, st){
+      NeomErrorLogger.recordError(e, st, module: 'neom_auth', operation: 'googleLogout');
     }
   }
 
@@ -503,20 +530,20 @@ class LoginController extends SintController implements LoginService {
           await signOut();
           break;
       }
-    } on GoogleSignInException catch (e) {
+    } on GoogleSignInException catch (e, st) {
       // Handle Google Sign-In specific exceptions
       if (e.code.name == 'canceled') {
         // User cancelled the sign-in, just log it - no need to show error
         AppConfig.logger.i("Google Sign-In cancelled by user");
       } else {
-        AppConfig.logger.e("Google Sign-In error: ${e.code.name} - ${e.description}");
+        NeomErrorLogger.recordError(e, st, module: 'neom_auth', operation: 'setAuthCredentials.googleSignIn');
         AppUtilities.showSnackBar(
           title: AuthTranslationConstants.loginError.tr,
           message: e.description ?? AuthTranslationConstants.loginFailed.tr,
         );
       }
-    } catch (e) {
-      AppConfig.logger.e(e.toString());
+    } catch (e, st) {
+      NeomErrorLogger.recordError(e, st, module: 'neom_auth', operation: 'setAuthCredentials');
       AppUtilities.showSnackBar(
         title: AuthTranslationConstants.loginError.tr,
         message: e.toString(),
@@ -574,8 +601,8 @@ class LoginController extends SintController implements LoginService {
       await _auth.signInWithCredential(credential);
       isPhoneAuth = true;
       return true;
-    } catch(e) {
-      AppConfig.logger.e(e.toString());
+    } catch(e, st) {
+      NeomErrorLogger.recordError(e, st, module: 'neom_auth', operation: 'validateSmsCode');
     }
     return false;
   }

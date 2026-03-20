@@ -6,6 +6,7 @@ import 'package:neom_commons/utils/constants/translations/common_translation_con
 import 'package:neom_core/app_config.dart';
 import 'package:neom_core/data/firestore/user_firestore.dart';
 import 'package:neom_core/utils/constants/app_route_constants.dart';
+import 'package:neom_core/utils/neom_error_logger.dart';
 import 'package:neom_core/utils/validator.dart';
 import '../../domain/use_cases/forgot_password_service.dart';
 import '../../utils/constants/auth_translation_constants.dart';
@@ -65,7 +66,8 @@ class ForgotPasswordController extends SintController implements ForgotPasswordS
         );
         return false;
       }
-    } catch (e) {
+    } catch (e, st) {
+      NeomErrorLogger.recordError(e, st, module: 'neom_auth', operation: 'submitForm');
       Sint.snackbar(
         CommonTranslationConstants.passwordReset.tr,
         e.toString(),
