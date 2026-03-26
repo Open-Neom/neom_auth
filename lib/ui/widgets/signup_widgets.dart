@@ -26,7 +26,7 @@ Widget buildEntryField(String hint, {required TextEditingController controller,
           borderRadius: BorderRadius.all(
             Radius.circular(30.0),
           ),
-          borderSide: BorderSide(color: Colors.blue),
+          borderSide: BorderSide(color: Colors.lightBlueAccent),
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: AppTheme.padding20),
       ),
@@ -39,7 +39,8 @@ Widget buildTwoEntryFields(String firstHint, String secondHint, {required TextEd
   required TextEditingController secondController,
   required BuildContext fieldsContext,
   FocusNode? firstFocusNode, FocusNode? secondFocusNode,
-  FocusNode? nextFocusNode, double? maxFieldWidth}) {
+  FocusNode? nextFocusNode, double? maxFieldWidth,
+  bool autofocusFirst = false}) {
   final fieldWidth = maxFieldWidth ?? AppTheme.fullWidth(fieldsContext)/2.5;
   return Row(
     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -51,6 +52,7 @@ Widget buildTwoEntryFields(String firstHint, String secondHint, {required TextEd
         child: TextField(
           controller: firstController,
           focusNode: firstFocusNode,
+          autofocus: autofocusFirst,
           textInputAction: TextInputAction.next,
           style: const TextStyle(
             fontStyle: FontStyle.normal,
@@ -64,7 +66,7 @@ Widget buildTwoEntryFields(String firstHint, String secondHint, {required TextEd
               borderRadius: BorderRadius.all(
                 Radius.circular(30.0),
               ),
-              borderSide: BorderSide(color: Colors.blue),
+              borderSide: BorderSide(color: Colors.lightBlueAccent),
             ),
             contentPadding: const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
           ),
@@ -90,7 +92,7 @@ Widget buildTwoEntryFields(String firstHint, String secondHint, {required TextEd
               borderRadius: BorderRadius.all(
                 Radius.circular(30.0),
               ),
-              borderSide: BorderSide(color: Colors.blue),
+              borderSide: BorderSide(color: Colors.lightBlueAccent),
             ),
             contentPadding: const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
           ),

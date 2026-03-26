@@ -10,6 +10,7 @@ import 'package:neom_commons/utils/constants/translations/app_translation_consta
 import 'package:neom_commons/utils/constants/translations/common_translation_constants.dart';
 import 'package:neom_commons/utils/external_utilities.dart';
 import 'package:neom_core/app_properties.dart';
+import 'package:neom_core/utils/constants/app_route_constants.dart';
 
 import '../../utils/constants/auth_translation_constants.dart';
 import '../widgets/signup_widgets.dart';
@@ -57,7 +58,7 @@ class SignupPage extends StatelessWidget {
               top: 32,
               left: 40,
               child: Text(
-                'EMXI',
+                AppProperties.getAppName().toUpperCase(),
                 style: TextStyle(
                   color: AppColor.textTertiary,
                   fontSize: 22,
@@ -71,7 +72,7 @@ class SignupPage extends StatelessWidget {
             // Botón de regreso
             Positioned(
               top: 28,
-              left: 100,
+              left: 200,
               child: IconButton(
                 icon: Icon(Icons.arrow_back, color: AppColor.textSecondary),
                 onPressed: () => Sint.back(),
@@ -88,15 +89,17 @@ class SignupPage extends StatelessWidget {
                     margin: const EdgeInsets.symmetric(horizontal: 24),
                     padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 32),
                     decoration: BoxDecoration(
-                      color: AppColor.white10,
+                      color: Color.lerp(AppColor.darkBackground, AppColor.getMain(), 0.15),
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
-                        color: AppColor.borderMedium,
+                        color: AppColor.getAccentColor().withAlpha(40),
                         width: 1,
                       ),
                     ),
                     child: Form(
-                      child: Column(
+                      child: FocusTraversalGroup(
+                        policy: OrderedTraversalPolicy(),
+                        child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           // Logo compacto
@@ -134,55 +137,73 @@ class SignupPage extends StatelessWidget {
                           const SizedBox(height: 16),
 
                           // First name + Last name
-                          buildTwoEntryFields(
-                            AppTranslationConstants.firstName.tr,
-                            AppTranslationConstants.lastName.tr,
-                            firstController: controller.firstNameController,
-                            secondController: controller.lastNameController,
-                            fieldsContext: context,
-                            firstFocusNode: controller.firstNameFocus,
-                            secondFocusNode: controller.lastNameFocus,
-                            nextFocusNode: controller.usernameFocus,
-                            maxFieldWidth: 170,
+                          FocusTraversalOrder(
+                            order: const NumericFocusOrder(1),
+                            child: buildTwoEntryFields(
+                              AppTranslationConstants.firstName.tr,
+                              AppTranslationConstants.lastName.tr,
+                              firstController: controller.firstNameController,
+                              secondController: controller.lastNameController,
+                              fieldsContext: context,
+                              firstFocusNode: controller.firstNameFocus,
+                              secondFocusNode: controller.lastNameFocus,
+                              nextFocusNode: controller.usernameFocus,
+                              maxFieldWidth: 170,
+                              autofocusFirst: true,
+                            ),
                           ),
 
                           // Username
-                          buildEntryField(
-                            AppTranslationConstants.username.tr,
-                            controller: controller.usernameController,
-                            focusNode: controller.usernameFocus,
-                            nextFocusNode: controller.emailFocus,
+                          FocusTraversalOrder(
+                            order: const NumericFocusOrder(2),
+                            child: buildEntryField(
+                              AppTranslationConstants.username.tr,
+                              controller: controller.usernameController,
+                              focusNode: controller.usernameFocus,
+                              nextFocusNode: controller.emailFocus,
+                            ),
                           ),
 
                           // Email
-                          buildEntryField(
-                            CommonTranslationConstants.enterEmail.tr,
-                            controller: controller.emailController,
-                            isEmail: true,
-                            focusNode: controller.emailFocus,
-                            nextFocusNode: controller.passwordFocus,
+                          FocusTraversalOrder(
+                            order: const NumericFocusOrder(3),
+                            child: buildEntryField(
+                              CommonTranslationConstants.enterEmail.tr,
+                              controller: controller.emailController,
+                              isEmail: true,
+                              focusNode: controller.emailFocus,
+                              nextFocusNode: controller.passwordFocus,
+                            ),
                           ),
 
                           // Password
-                          buildEntryField(
-                            AuthTranslationConstants.enterPassword.tr,
-                            controller: controller.passwordController,
-                            isPassword: true,
-                            focusNode: controller.passwordFocus,
-                            nextFocusNode: controller.confirmFocus,
+                          FocusTraversalOrder(
+                            order: const NumericFocusOrder(4),
+                            child: buildEntryField(
+                              AuthTranslationConstants.enterPassword.tr,
+                              controller: controller.passwordController,
+                              isPassword: true,
+                              focusNode: controller.passwordFocus,
+                              nextFocusNode: controller.confirmFocus,
+                            ),
                           ),
 
                           // Confirm password
-                          buildEntryField(
-                            AuthTranslationConstants.confirmPassword.tr,
-                            controller: controller.confirmController,
-                            isPassword: true,
-                            focusNode: controller.confirmFocus,
-                            textInputAction: TextInputAction.done,
+                          FocusTraversalOrder(
+                            order: const NumericFocusOrder(5),
+                            child: buildEntryField(
+                              AuthTranslationConstants.confirmPassword.tr,
+                              controller: controller.confirmController,
+                              isPassword: true,
+                              focusNode: controller.confirmFocus,
+                              textInputAction: TextInputAction.done,
+                            ),
                           ),
 
                           // Terms checkbox
-                          Row(
+                          FocusTraversalOrder(
+                            order: const NumericFocusOrder(6),
+                            child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Checkbox(
@@ -208,35 +229,39 @@ class SignupPage extends StatelessWidget {
                                   style: const TextStyle(fontSize: 12),
                                 ),
                                 onPressed: () async {
-                                  ExternalUtilities.launchURL(AppProperties.getTermsOfServiceUrl());
+                                  Sint.toNamed(AppRouteConstants.termsConditions);
                                 },
                               ),
                             ],
                           ),
+                          ),
 
                           // Sign up button
                           if (controller.agreeTerms.value)
-                            Container(
-                              margin: const EdgeInsets.only(top: 8),
-                              width: double.infinity,
-                              child: ElevatedButton(
-                                onPressed: () => controller.submit(context),
-                                style: ElevatedButton.styleFrom(
-                                  elevation: 5.0,
-                                  padding: const EdgeInsets.all(15.0),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(30.0),
+                            FocusTraversalOrder(
+                              order: const NumericFocusOrder(7),
+                              child: Container(
+                                margin: const EdgeInsets.only(top: 8),
+                                width: double.infinity,
+                                child: ElevatedButton(
+                                  onPressed: () => controller.submit(context),
+                                  style: ElevatedButton.styleFrom(
+                                    elevation: 5.0,
+                                    padding: const EdgeInsets.all(15.0),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(30.0),
+                                    ),
+                                    backgroundColor: Colors.white,
                                   ),
-                                  backgroundColor: Colors.white,
-                                ),
-                                child: Text(
-                                  AuthTranslationConstants.signUp.tr.toUpperCase(),
-                                  style: const TextStyle(
-                                    color: AppColor.textButton,
-                                    letterSpacing: 1.5,
-                                    fontSize: 18.0,
-                                    fontWeight: FontWeight.bold,
-                                    fontFamily: AppTheme.fontFamily,
+                                  child: Text(
+                                    AuthTranslationConstants.signUp.tr.toUpperCase(),
+                                    style: const TextStyle(
+                                      color: AppColor.textButton,
+                                      letterSpacing: 1.5,
+                                      fontSize: 18.0,
+                                      fontWeight: FontWeight.bold,
+                                      fontFamily: AppTheme.fontFamily,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -258,6 +283,7 @@ class SignupPage extends StatelessWidget {
                             ),
                           ),
                         ],
+                      ),
                       ),
                     ),
                   ),
@@ -314,7 +340,7 @@ class SignupPage extends StatelessWidget {
                           style: const TextStyle(fontSize: 12),
                         ),
                         onPressed: () async {
-                          ExternalUtilities.launchURL(AppProperties.getTermsOfServiceUrl());
+                          Sint.toNamed(AppRouteConstants.termsConditions);
                         }
                     ),
                   ],

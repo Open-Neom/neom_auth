@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:neom_core/app_properties.dart';
 import 'package:sint/sint.dart';
 import 'package:neom_commons/app_flavour.dart';
 import 'package:neom_commons/ui/theme/app_color.dart';
@@ -52,7 +53,7 @@ class ForgotPasswordPage extends StatelessWidget {
               top: 32,
               left: 40,
               child: Text(
-                'EMXI',
+                AppProperties.getAppName().toUpperCase(),
                 style: TextStyle(
                   color: AppColor.textTertiary,
                   fontSize: 22,
@@ -66,7 +67,7 @@ class ForgotPasswordPage extends StatelessWidget {
             // Botón de regreso
             Positioned(
               top: 28,
-              left: 100,
+              left: 200,
               child: IconButton(
                 icon: Icon(Icons.arrow_back, color: AppColor.textSecondary),
                 onPressed: () => Sint.back(),
@@ -83,10 +84,10 @@ class ForgotPasswordPage extends StatelessWidget {
                     margin: const EdgeInsets.symmetric(horizontal: 24),
                     padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 36),
                     decoration: BoxDecoration(
-                      color: AppColor.white10,
+                      color: Color.lerp(AppColor.darkBackground, AppColor.getMain(), 0.15),
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
-                        color: AppColor.borderMedium,
+                        color: AppColor.getAccentColor().withAlpha(40),
                         width: 1,
                       ),
                     ),
@@ -133,7 +134,10 @@ class ForgotPasswordPage extends StatelessWidget {
                           child: TextField(
                             focusNode: controller.focusNode,
                             controller: controller.emailController,
+                            autofocus: true,
                             keyboardType: TextInputType.emailAddress,
+                            textInputAction: TextInputAction.done,
+                            onSubmitted: (_) => controller.submitForm(context),
                             style: const TextStyle(
                               color: Colors.white,
                               fontFamily: AppTheme.fontFamily,

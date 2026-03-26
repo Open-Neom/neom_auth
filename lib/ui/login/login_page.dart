@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:neom_core/app_properties.dart';
 import 'package:neom_core/utils/platform/core_io.dart';
 import 'package:flutter/material.dart';
 import 'package:sint/sint.dart';
@@ -52,7 +53,7 @@ class LoginPage extends StatelessWidget {
                 center: Alignment.center,
                 radius: 1.2,
                 colors: [
-                  AppColor.getMain().withAlpha(50),
+                  AppColor.getMain().withAlpha(80),
                   AppColor.darkBackground,
                 ],
               ),
@@ -64,7 +65,7 @@ class LoginPage extends StatelessWidget {
                   top: 32,
                   left: 40,
                   child: Text(
-                    'EMXI',
+                    AppProperties.getAppName().toUpperCase(),
                     style: TextStyle(
                       color: AppColor.textTertiary,
                       fontSize: 22,
@@ -85,10 +86,10 @@ class LoginPage extends StatelessWidget {
                         margin: const EdgeInsets.symmetric(horizontal: 24),
                         padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 36),
                         decoration: BoxDecoration(
-                          color: AppColor.white10,
+                          color: Color.lerp(AppColor.darkBackground, AppColor.getMain(), 0.15),
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
-                            color: AppColor.borderMedium,
+                            color: AppColor.getAccentColor().withAlpha(40),
                             width: 1,
                           ),
                         ),
@@ -128,19 +129,40 @@ class LoginPage extends StatelessWidget {
 
                             const SizedBox(height: 24),
 
-                            // Email field
-                            buildEmailTF(controller),
+                            // Form fields — Tab key cycles through these in order
+                            FocusTraversalGroup(
+                              policy: OrderedTraversalPolicy(),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  // Email field
+                                  FocusTraversalOrder(
+                                    order: const NumericFocusOrder(1),
+                                    child: buildEmailTF(controller, autofocus: true),
+                                  ),
 
-                            const SizedBox(height: 12),
+                                  const SizedBox(height: 12),
 
-                            // Password field
-                            buildPasswordTF(controller),
+                                  // Password field
+                                  FocusTraversalOrder(
+                                    order: const NumericFocusOrder(2),
+                                    child: buildPasswordTF(controller),
+                                  ),
 
-                            // Forgot password
-                            buildForgotPasswordBtn(controller),
+                                  // Forgot password
+                                  FocusTraversalOrder(
+                                    order: const NumericFocusOrder(3),
+                                    child: buildForgotPasswordBtn(controller),
+                                  ),
 
-                            // Login button
-                            buildLoginBtn(controller),
+                                  // Login button
+                                  FocusTraversalOrder(
+                                    order: const NumericFocusOrder(4),
+                                    child: buildLoginBtn(controller),
+                                  ),
+                                ],
+                              ),
+                            ),
 
                             const SizedBox(height: 12),
 

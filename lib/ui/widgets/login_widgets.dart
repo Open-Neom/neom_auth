@@ -16,7 +16,7 @@ import '../login/login_controller.dart';
 
   bool _rememberMe = false;
 
-  Widget buildEmailTF(LoginController controller) {
+  Widget buildEmailTF(LoginController controller, {bool autofocus = false}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
@@ -29,6 +29,7 @@ import '../login/login_controller.dart';
           child: TextField(
             controller: controller.emailController,
             focusNode: controller.emailFocusNode,
+            autofocus: autofocus,
             keyboardType: TextInputType.emailAddress,
             textInputAction: TextInputAction.next,
             onSubmitted: (_) => controller.passwordFocusNode.requestFocus(),
@@ -157,7 +158,7 @@ import '../login/login_controller.dart';
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(30.0),
           ),
-          backgroundColor: Colors.white,),
+          backgroundColor: AppColor.getAccentColor(),),
         child: Text(
           AppTranslationConstants.login.toUpperCase(),
           style: const TextStyle(

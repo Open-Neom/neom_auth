@@ -13,6 +13,7 @@ import 'package:neom_core/utils/neom_error_logger.dart';
 import 'package:neom_core/utils/neom_flow_tracker.dart';
 import 'package:neom_core/cloud_properties.dart';
 import 'package:neom_core/data/firestore/constants/app_firestore_constants.dart';
+import 'package:neom_core/data/firestore/profile_firestore.dart';
 import 'package:neom_core/data/implementations/app_hive_controller.dart';
 import 'package:neom_core/domain/model/app_profile.dart';
 import 'package:neom_core/domain/model/app_user.dart';
@@ -184,6 +185,11 @@ class LoginController extends SintController implements LoginService {
         } else {
           authStatus.value = AuthStatus.loggedIn;
           AppConfig.instance.isGuestMode = false;
+          // Sync Google Auth photo to profile if profile has no photo
+          if (user.photoURL?.isNotEmpty == true && userServiceImpl.profile.photoUrl.isEmpty) {
+            userServiceImpl.profile.photoUrl = user.photoURL!;
+            ProfileFirestore().updatePhotoUrl(userServiceImpl.profile.id, user.photoURL!);
+          }
           await Sint.find<AppHiveController>().writeProfileInfo();
         }
 
