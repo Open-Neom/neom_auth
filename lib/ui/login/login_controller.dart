@@ -9,6 +9,7 @@ import 'package:neom_commons/utils/constants/translations/message_translation_co
 import 'package:neom_commons/utils/device_utilities.dart';
 import 'package:neom_commons/utils/security_utilities.dart';
 import 'package:neom_core/app_config.dart';
+import 'package:neom_core/utils/enums/app_in_use.dart';
 import 'package:neom_core/utils/neom_error_logger.dart';
 import 'package:neom_core/utils/neom_flow_tracker.dart';
 import 'package:neom_core/cloud_properties.dart';
@@ -224,7 +225,32 @@ class LoginController extends SintController implements LoginService {
   void gotoIntroPage() {
     AppConfig.logger.i("New User found for $_userId. Redirecting to Intro Page");
     authStatus.value = AuthStatus.loggedIn;
+
+    // SAIA OAuth: skip full onboarding, create account directly
+    if (AppConfig.instance.appInUse == AppInUse.i
+        && (signedInWith == SignedInWith.google || signedInWith == SignedInWith.apple)) {
+      AppConfig.logger.i("SAIA OAuth detected (signedInWith: $signedInWith). Skipping onboarding.");
+      _quickCreateSaiaAccount();
+      return;
+    }
+
     Sint.toNamed(AppRouteConstants.introRequiredPermissions);
+  }
+
+  /// Fast-track account creation for SAIA OAuth sign-ins.
+  /// Uses OAuth profile data (name, photo) and skips onboarding wizard.
+  Future<void> _quickCreateSaiaAccount() async {
+    try {
+      AppConfig.logger.i("SAIA OAuth quick-create for $_userId");
+      await userServiceImpl.createUser();
+      NeomFlowTracker.endFlow('registration');
+      Sint.offAllNamed(AppRouteConstants.home);
+    } catch (e, st) {
+      AppConfig.logger.e("SAIA quick create failed: $e");
+      NeomErrorLogger.recordError(e, st, module: 'neom_auth', operation: 'quickCreateSaia');
+      // Fallback to normal onboarding
+      Sint.toNamed(AppRouteConstants.introRequiredPermissions);
+    }
   }
 
   Future<void> handleLogin(LoginMethod logMethod) async {

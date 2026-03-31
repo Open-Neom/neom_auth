@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:sint/sint.dart';
 import 'package:neom_commons/ui/theme/app_color.dart';
 import 'package:neom_commons/ui/theme/app_theme.dart';
@@ -26,26 +27,36 @@ import '../login/login_controller.dart';
           alignment: Alignment.centerLeft,
           decoration: AppTheme.kBoxDecorationStyle,
           height: 50.0,
-          child: TextField(
-            controller: controller.emailController,
-            focusNode: controller.emailFocusNode,
-            autofocus: autofocus,
-            keyboardType: TextInputType.emailAddress,
-            textInputAction: TextInputAction.next,
-            onSubmitted: (_) => controller.passwordFocusNode.requestFocus(),
-            style: const TextStyle(
-              color: Colors.white,
-              fontFamily: AppTheme.fontFamily,
-            ),
-            decoration: InputDecoration(
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.only(top: 14.0),
-              prefixIcon: const Icon(
-                Icons.email,
+          child: Focus(
+            skipTraversal: true,
+            onKeyEvent: (_, event) {
+              if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.tab) {
+                controller.passwordFocusNode.requestFocus();
+                return KeyEventResult.handled;
+              }
+              return KeyEventResult.ignored;
+            },
+            child: TextField(
+              controller: controller.emailController,
+              focusNode: controller.emailFocusNode,
+              autofocus: autofocus,
+              keyboardType: TextInputType.emailAddress,
+              textInputAction: TextInputAction.next,
+              onSubmitted: (_) => controller.passwordFocusNode.requestFocus(),
+              style: const TextStyle(
                 color: Colors.white,
+                fontFamily: AppTheme.fontFamily,
               ),
-              hintText: CommonTranslationConstants.enterEmail.tr,
-              hintStyle: AppTheme.kHintTextStyle,
+              decoration: InputDecoration(
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.only(top: 14.0),
+                prefixIcon: const Icon(
+                  Icons.email,
+                  color: Colors.white,
+                ),
+                hintText: CommonTranslationConstants.enterEmail.tr,
+                hintStyle: AppTheme.kHintTextStyle,
+              ),
             ),
           ),
         ),
