@@ -1,7 +1,7 @@
 dependency_overrides:
   neom_core:
-    path: ../main/neom_core
+    path: ../../main/neom_core
   neom_commons:
-    path: ../main/neom_commons
+    path: ../../main/neom_commons
   sint:
-    path: ../framework/sint
+    path: ../../framework/sint

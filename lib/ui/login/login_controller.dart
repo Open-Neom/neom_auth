@@ -201,8 +201,22 @@ class LoginController extends SintController implements LoginService {
         } else if (authStatus.value == AuthStatus.loggedIn) {
           NeomFlowTracker.setUserId(userServiceImpl.user.id);
           NeomFlowTracker.endFlow('login');
-          AppConfig.logger.i("User found for $_userId. Redirecting to Root Page");
-          Sint.offAllNamed(AppRouteConstants.root);
+          // Only redirect to root when the user is on a neutral entry point
+          // (root, login, or empty). If they arrived via deep-link
+          // (e.g. /fil-guadalajara), preserve that route — RootPage's
+          // Obx(selectRootPage) will reactively swap to the home widget
+          // when authStatus flips to loggedIn, so no explicit nav is
+          // needed for the `/` case either.
+          final currentRoute = Sint.currentRoute;
+          final isOnEntryPoint = currentRoute.isEmpty
+              || currentRoute == AppRouteConstants.root
+              || currentRoute == AppRouteConstants.login;
+          if (isOnEntryPoint) {
+            AppConfig.logger.i("User found for $_userId. Redirecting to Root Page");
+            Sint.offAllNamed(AppRouteConstants.root);
+          } else {
+            AppConfig.logger.i("User found for $_userId. Preserving deep-link route: $currentRoute");
+          }
         }
       }
     } catch (e, st) {

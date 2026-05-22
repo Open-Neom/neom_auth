@@ -169,7 +169,7 @@ import '../login/login_controller.dart';
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(30.0),
           ),
-          backgroundColor: AppColor.getAccentColor(),),
+          backgroundColor: AppColor.white80,),
         child: Text(
           AppTranslationConstants.login.toUpperCase(),
           style: const TextStyle(
