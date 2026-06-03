@@ -8,6 +8,7 @@ import 'package:neom_commons/utils/app_utilities.dart';
 import 'package:neom_commons/utils/constants/translations/message_translation_constants.dart';
 import 'package:neom_commons/utils/device_utilities.dart';
 import 'package:neom_commons/utils/security_utilities.dart';
+import 'package:neom_commons/utils/auth_guard.dart';
 import 'package:neom_core/app_config.dart';
 import 'package:neom_core/utils/enums/app_in_use.dart';
 import 'package:neom_core/utils/neom_error_logger.dart';
@@ -71,18 +72,34 @@ class LoginController extends SintController implements LoginService {
     _fbaUser.listen(handleAuthChanged);
 
     if(kIsWeb) {
-      _googleSignIn.initialize(clientId: CloudProperties.getWebCliendId());
+      try {
+        _googleSignIn.initialize(clientId: CloudProperties.getWebCliendId());
+      } catch (e) {
+        AppConfig.logger.e("Failed to initialize Google Sign In on web: $e");
+      }
       isAppleSignInAvailable = true;
       _checkRedirectResult();
     } else if(Platform.isAndroid) {
       AppConfig.logger.t(Platform.version);
-      _googleSignIn.initialize(serverClientId: CloudProperties.getServerCliendId());
+      try {
+        _googleSignIn.initialize(serverClientId: CloudProperties.getServerCliendId());
+      } catch (e) {
+        AppConfig.logger.e("Failed to initialize Google Sign In on Android: $e");
+      }
     } else if(Platform.isIOS) {
       isAppleSignInAvailable = DeviceUtilities.isDeviceSupportedVersion(isIOS: Platform.isIOS);
-      _googleSignIn.initialize();
+      try {
+        _googleSignIn.initialize();
+      } catch (e) {
+        AppConfig.logger.e("Failed to initialize Google Sign In on iOS: $e");
+      }
     } else if(Platform.isMacOS) {
       isAppleSignInAvailable = true;
-      _googleSignIn.initialize(clientId: CloudProperties.getWebCliendId());
+      try {
+        _googleSignIn.initialize(clientId: CloudProperties.getWebCliendId());
+      } catch (e) {
+        AppConfig.logger.e("Failed to initialize Google Sign In on macOS: $e");
+      }
     }
 
   }
@@ -201,21 +218,30 @@ class LoginController extends SintController implements LoginService {
         } else if (authStatus.value == AuthStatus.loggedIn) {
           NeomFlowTracker.setUserId(userServiceImpl.user.id);
           NeomFlowTracker.endFlow('login');
-          // Only redirect to root when the user is on a neutral entry point
-          // (root, login, or empty). If they arrived via deep-link
-          // (e.g. /fil-guadalajara), preserve that route — RootPage's
-          // Obx(selectRootPage) will reactively swap to the home widget
-          // when authStatus flips to loggedIn, so no explicit nav is
-          // needed for the `/` case either.
-          final currentRoute = Sint.currentRoute;
-          final isOnEntryPoint = currentRoute.isEmpty
-              || currentRoute == AppRouteConstants.root
-              || currentRoute == AppRouteConstants.login;
-          if (isOnEntryPoint) {
-            AppConfig.logger.i("User found for $_userId. Redirecting to Root Page");
-            Sint.offAllNamed(AppRouteConstants.root);
+          // Check if redirected from a protected route
+          if (Sint.arguments != null && Sint.arguments['nextRoute'] != null) {
+            String nextRoute = Sint.arguments['nextRoute'];
+            dynamic nextArgs = Sint.arguments['nextArgs'];
+            AppConfig.logger.i("Redirecting to nextRoute after login success: $nextRoute");
+            Sint.offAllNamed(nextRoute, arguments: nextArgs);
+          } else if (AuthGuard.pendingRedirectRoute != null) {
+            final nextRoute = AuthGuard.pendingRedirectRoute!;
+            final nextArgs = AuthGuard.pendingRedirectArgs;
+            AuthGuard.pendingRedirectRoute = null;
+            AuthGuard.pendingRedirectArgs = null;
+            AppConfig.logger.i("Redirecting to pending nextRoute: $nextRoute");
+            Sint.offAllNamed(nextRoute, arguments: nextArgs);
           } else {
-            AppConfig.logger.i("User found for $_userId. Preserving deep-link route: $currentRoute");
+            final currentRoute = Sint.currentRoute;
+            final isOnEntryPoint = currentRoute.isEmpty
+                || currentRoute == AppRouteConstants.root
+                || currentRoute == AppRouteConstants.login;
+            if (isOnEntryPoint) {
+              AppConfig.logger.i("User found for $_userId. Redirecting to Root Page");
+              Sint.offAllNamed(AppRouteConstants.root);
+            } else {
+              AppConfig.logger.i("User found for $_userId. Preserving deep-link route: $currentRoute");
+            }
           }
         }
       }
@@ -258,7 +284,17 @@ class LoginController extends SintController implements LoginService {
       AppConfig.logger.i("SAIA OAuth quick-create for $_userId");
       await userServiceImpl.createUser();
       NeomFlowTracker.endFlow('registration');
-      Sint.offAllNamed(AppRouteConstants.home);
+      
+      if (AuthGuard.pendingRedirectRoute != null) {
+        final nextRoute = AuthGuard.pendingRedirectRoute!;
+        final nextArgs = AuthGuard.pendingRedirectArgs;
+        AuthGuard.pendingRedirectRoute = null;
+        AuthGuard.pendingRedirectArgs = null;
+        AppConfig.logger.i("Redirecting to pending nextRoute after SAIA quick-signup: $nextRoute");
+        Sint.offAllNamed(nextRoute, arguments: nextArgs);
+      } else {
+        Sint.offAllNamed(AppRouteConstants.home);
+      }
     } catch (e, st) {
       AppConfig.logger.e("SAIA quick create failed: $e");
       NeomErrorLogger.recordError(e, st, module: 'neom_auth', operation: 'quickCreateSaia');
