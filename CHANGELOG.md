@@ -1,3 +1,8 @@
+# Changelog - neom_auth
+
+## Unreleased - System updates
+- Actualizaciones de estabilidad y compatibilidad.
+
 ### 2.0.0 - Security & UX Improvements
 
 This release focuses on security enhancements and improved user experience during authentication flows.

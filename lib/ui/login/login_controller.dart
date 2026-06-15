@@ -3,7 +3,7 @@ import 'package:neom_core/utils/platform/core_io.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:sint/sint.dart';
-import 'package:google_sign_in/google_sign_in.dart';
+import 'package:neom_core/domain/use_cases/google_auth_service.dart';
 import 'package:neom_commons/utils/app_utilities.dart';
 import 'package:neom_commons/utils/constants/translations/message_translation_constants.dart';
 import 'package:neom_commons/utils/device_utilities.dart';
@@ -39,8 +39,6 @@ class LoginController extends SintController implements LoginService {
 
   final FocusNode emailFocusNode = FocusNode();
   final FocusNode passwordFocusNode = FocusNode();
-
-  final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
   Rx<AuthStatus> authStatus = AuthStatus.notDetermined.obs;
 
   String _userId = "";
@@ -72,34 +70,14 @@ class LoginController extends SintController implements LoginService {
     _fbaUser.listen(handleAuthChanged);
 
     if(kIsWeb) {
-      try {
-        _googleSignIn.initialize(clientId: CloudProperties.getWebCliendId());
-      } catch (e) {
-        AppConfig.logger.e("Failed to initialize Google Sign In on web: $e");
-      }
       isAppleSignInAvailable = true;
       _checkRedirectResult();
     } else if(Platform.isAndroid) {
       AppConfig.logger.t(Platform.version);
-      try {
-        _googleSignIn.initialize(serverClientId: CloudProperties.getServerCliendId());
-      } catch (e) {
-        AppConfig.logger.e("Failed to initialize Google Sign In on Android: $e");
-      }
     } else if(Platform.isIOS) {
       isAppleSignInAvailable = DeviceUtilities.isDeviceSupportedVersion(isIOS: Platform.isIOS);
-      try {
-        _googleSignIn.initialize();
-      } catch (e) {
-        AppConfig.logger.e("Failed to initialize Google Sign In on iOS: $e");
-      }
     } else if(Platform.isMacOS) {
       isAppleSignInAvailable = true;
-      try {
-        _googleSignIn.initialize(clientId: CloudProperties.getWebCliendId());
-      } catch (e) {
-        AppConfig.logger.e("Failed to initialize Google Sign In on macOS: $e");
-      }
     }
 
   }
@@ -501,7 +479,7 @@ class LoginController extends SintController implements LoginService {
   //TODO To Verify Implementation
   Future<void> googleLogout() async {
     try {
-      await _googleSignIn.signOut();
+      await Sint.find<GoogleAuthService>().signOut();
     } catch (e, st){
       NeomErrorLogger.recordError(e, st, module: 'neom_auth', operation: 'googleLogout');
     }
@@ -589,21 +567,21 @@ class LoginController extends SintController implements LoginService {
 
           break;
         case(LoginMethod.google):
-          // FIXED: Added null safety checks for GoogleSignIn
-          final GoogleSignInAccount? googleUser = await _googleSignIn.authenticate();
-          if (googleUser == null) {
-            AppConfig.logger.w("Google Sign-In was cancelled by user");
+          final googleAuthService = Sint.find<GoogleAuthService>();
+          final success = await googleAuthService.signIn();
+          if (!success) {
+            AppConfig.logger.w("Google Sign-In was cancelled or failed");
             credentials = null;
             break;
           }
-          final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-          if (googleAuth.idToken == null) {
+          final idToken = googleAuthService.idToken;
+          if (idToken == null) {
             AppConfig.logger.e("Google Sign-In failed: No idToken received");
             credentials = null;
             break;
           }
           credentials = fba.GoogleAuthProvider.credential(
-              idToken: googleAuth.idToken,
+              idToken: idToken,
           );
           break;
         case(LoginMethod.spotify):
@@ -611,18 +589,6 @@ class LoginController extends SintController implements LoginService {
         case(LoginMethod.notDetermined):
           await signOut();
           break;
-      }
-    } on GoogleSignInException catch (e, st) {
-      // Handle Google Sign-In specific exceptions
-      if (e.code.name == 'canceled') {
-        // User cancelled the sign-in, just log it - no need to show error
-        AppConfig.logger.i("Google Sign-In cancelled by user");
-      } else {
-        NeomErrorLogger.recordError(e, st, module: 'neom_auth', operation: 'setAuthCredentials.googleSignIn');
-        AppUtilities.showSnackBar(
-          title: AuthTranslationConstants.loginError.tr,
-          message: e.description ?? AuthTranslationConstants.loginFailed.tr,
-        );
       }
     } catch (e, st) {
       NeomErrorLogger.recordError(e, st, module: 'neom_auth', operation: 'setAuthCredentials');
