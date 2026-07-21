@@ -1,3 +1,6 @@
+
+## [2.0.0-unreleased] - 2026-07-21
+- Fix phone authentication processing semaphore lockup and resolve resource leaks by implementing onClose() for signup and forgot password text controllers.
 # Changelog - neom_auth
 
 ## Unreleased - System updates

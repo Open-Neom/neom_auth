@@ -53,7 +53,7 @@ class SignUpController extends SintController implements SignUpService {
   }
 
   @override
-  void dispose() {
+  void onClose() {
     firstNameController.dispose();
     lastNameController.dispose();
     usernameController.dispose();
@@ -66,7 +66,7 @@ class SignUpController extends SintController implements SignUpService {
     emailFocus.dispose();
     passwordFocus.dispose();
     confirmFocus.dispose();
-    super.dispose();
+    super.onClose();
   }
 
   @override

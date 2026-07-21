@@ -41,11 +41,11 @@ class ForgotPasswordController extends SintController implements ForgotPasswordS
   }
 
   @override
-  void dispose() {
+  void onClose() {
     emailController.dispose();
     nameController.dispose();
     focusNode.dispose();
-    super.dispose();
+    super.onClose();
   }
 
   @override

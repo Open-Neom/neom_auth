@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart' as fba;
 import 'package:neom_core/utils/platform/core_io.dart';
 import 'package:flutter/foundation.dart';
@@ -47,6 +49,8 @@ class LoginController extends SintController implements LoginService {
 
   fba.FirebaseAuth _auth = fba.FirebaseAuth.instance;
   final Rxn<fba.User> _fbaUser = Rxn<fba.User>();
+  StreamSubscription<fba.User?>? _authStateChangesSubscription;
+  StreamSubscription<fba.User?>? _fbaUserSubscription;
 
   SignedInWith _signedInWith = SignedInWith.notDetermined;
   LoginMethod loginMethod = LoginMethod.notDetermined;
@@ -64,10 +68,10 @@ class LoginController extends SintController implements LoginService {
   void onInit() {
     super.onInit();
     AppConfig.logger.t("onInit Login Controller");
-    _fbaUser.bindStream(_auth.authStateChanges());
-    //_fbaUser.value = _auth.currentUser;
-    ///DEPRECATED ever<fba.User?>(_fbaUser, handleAuthChanged);
-    _fbaUser.listen(handleAuthChanged);
+    _authStateChangesSubscription = _auth.authStateChanges().listen((user) {
+      _fbaUser.value = user;
+    });
+    _fbaUserSubscription = _fbaUser.listen(handleAuthChanged);
 
     if(kIsWeb) {
       isAppleSignInAvailable = true;
@@ -91,10 +95,12 @@ class LoginController extends SintController implements LoginService {
 
   @override
   void onClose() {
-    // NOTE: Do NOT dispose TextEditingControllers here.
-    // SintBuilder manages the controller lifecycle and the widget may still
-    // be rendering when onClose is called during navigation (offAllNamed).
-    // The controllers will be garbage collected when the controller is disposed.
+    _authStateChangesSubscription?.cancel();
+    _fbaUserSubscription?.cancel();
+    emailController.dispose();
+    passwordController.dispose();
+    emailFocusNode.dispose();
+    passwordFocusNode.dispose();
     super.onClose();
   }
 
@@ -135,9 +141,8 @@ class LoginController extends SintController implements LoginService {
     NeomFlowTracker.startFlow('login');
     authStatus.value = AuthStatus.waiting;
 
-    if(isPhoneAuth) return;
-
     try {
+      if(isPhoneAuth) return;
       if(_auth.currentUser == null) {
         authStatus.value = AuthStatus.notLoggedIn;
         _auth = fba.FirebaseAuth.instance;
