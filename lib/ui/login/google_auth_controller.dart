@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart';
 import 'package:sint/sint.dart';
 
 class GoogleAuthController extends SintController implements GoogleAuthService {
+  static bool _initializedGoogleSignInOnce = false;
   final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
   GoogleSignInAccount? _currentUser;
   GoogleSignInAuthentication? _authCreds;
@@ -44,16 +45,19 @@ class GoogleAuthController extends SintController implements GoogleAuthService {
   }
 
   void _initializeGoogleSignIn() {
+    if (_initializedGoogleSignInOnce) {
+      AppConfig.logger.d("GoogleAuthController: Google Sign In already initialized, skipping.");
+      return;
+    }
     try {
       if (kIsWeb) {
         _googleSignIn.initialize(clientId: CloudProperties.getWebCliendId());
       } else if (Platform.isAndroid) {
         _googleSignIn.initialize(serverClientId: CloudProperties.getServerCliendId());
-      } else if (Platform.isIOS) {
+      } else if (Platform.isIOS || Platform.isMacOS) {
         _googleSignIn.initialize();
-      } else if (Platform.isMacOS) {
-        _googleSignIn.initialize(clientId: CloudProperties.getWebCliendId());
       }
+      _initializedGoogleSignInOnce = true;
     } catch (e, st) {
       AppConfig.logger.e("Failed to initialize Google Sign In: $e");
       NeomErrorLogger.recordError(e, st, module: 'neom_auth', operation: 'initializeGoogleSignIn');
