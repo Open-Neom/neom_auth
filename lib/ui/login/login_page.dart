@@ -25,7 +25,9 @@ class LoginPage extends StatelessWidget {
       id: AppPageIdConstants.login,
       init: LoginController(),
       builder: (controller) {
-        if (kIsWeb) {
+        // Usar diseño de tarjeta web/escritorio para macOS, Windows, Linux y Web
+        final isDesktop = !kIsWeb && (Platform.isMacOS || Platform.isWindows || Platform.isLinux);
+        if (kIsWeb || isDesktop) {
           return _buildWebLogin(context, controller);
         }
         return _buildMobileLogin(context, controller);
