@@ -1,3 +1,6 @@
+## [2026-07-25] - Dependencias Externas
+- Actualizacion de dependencias externas a sus versiones mas recientes y compatibles.
+
 
 ## [2.0.0-unreleased] - 2026-07-21
 - Fix phone authentication processing semaphore lockup and resolve resource leaks by implementing onClose() for signup and forgot password text controllers.
