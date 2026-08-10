@@ -95,12 +95,15 @@ class LoginController extends SintController implements LoginService {
 
   @override
   void onClose() {
-    _authStateChangesSubscription?.cancel();
-    _fbaUserSubscription?.cancel();
-    emailController.dispose();
-    passwordController.dispose();
-    emailFocusNode.dispose();
-    passwordFocusNode.dispose();
+    // NOTE: Do NOT dispose TextEditingControllers/FocusNodes nor cancel the
+    // auth subscriptions here. This controller is registered as
+    // `permanent: true` in every host app's RootBinding (Gigmeout, Emxi,
+    // Cyberneom), but Sint still calls onClose during navigation
+    // (offAllNamed) — while the SAME instance keeps being served. Disposing
+    // resources here leaves the login page broken with
+    // "FocusNode was used after being disposed" on the next visit.
+    // The controllers are garbage collected when the controller itself is
+    // disposed at app shutdown.
     super.onClose();
   }
 
