@@ -36,11 +36,47 @@ class LoginController extends SintController implements LoginService {
 
   final userServiceImpl = Sint.find<UserService>();
 
-  final TextEditingController emailController = TextEditingController();
-  final TextEditingController passwordController = TextEditingController();
+  TextEditingController _emailController = TextEditingController();
+  TextEditingController _passwordController = TextEditingController();
 
-  final FocusNode emailFocusNode = FocusNode();
-  final FocusNode passwordFocusNode = FocusNode();
+  FocusNode _emailFocusNode = FocusNode();
+  FocusNode _passwordFocusNode = FocusNode();
+
+  TextEditingController get emailController {
+    try {
+      final _ = _emailController.text;
+    } catch (_) {
+      _emailController = TextEditingController();
+    }
+    return _emailController;
+  }
+
+  TextEditingController get passwordController {
+    try {
+      final _ = _passwordController.text;
+    } catch (_) {
+      _passwordController = TextEditingController();
+    }
+    return _passwordController;
+  }
+
+  FocusNode get emailFocusNode {
+    try {
+      final _ = _emailFocusNode.hasFocus;
+    } catch (_) {
+      _emailFocusNode = FocusNode();
+    }
+    return _emailFocusNode;
+  }
+
+  FocusNode get passwordFocusNode {
+    try {
+      final _ = _passwordFocusNode.hasFocus;
+    } catch (_) {
+      _passwordFocusNode = FocusNode();
+    }
+    return _passwordFocusNode;
+  }
   Rx<AuthStatus> authStatus = AuthStatus.notDetermined.obs;
 
   String _userId = "";
@@ -189,10 +225,18 @@ class LoginController extends SintController implements LoginService {
         } else {
           authStatus.value = AuthStatus.loggedIn;
           AppConfig.instance.isGuestMode = false;
-          // Sync Google Auth photo to profile if profile has no photo
+          // Sync Google Auth photo and name to profile if profile fields are empty
+          if (user.displayName?.isNotEmpty == true && userServiceImpl.profile.name.isEmpty) {
+            userServiceImpl.profile.name = user.displayName!;
+            if (userServiceImpl.profile.id.isNotEmpty) {
+              ProfileFirestore().updateName(userServiceImpl.profile.id, user.displayName!);
+            }
+          }
           if (user.photoURL?.isNotEmpty == true && userServiceImpl.profile.photoUrl.isEmpty) {
             userServiceImpl.profile.photoUrl = user.photoURL!;
-            ProfileFirestore().updatePhotoUrl(userServiceImpl.profile.id, user.photoURL!);
+            if (userServiceImpl.profile.id.isNotEmpty) {
+              ProfileFirestore().updatePhotoUrl(userServiceImpl.profile.id, user.photoURL!);
+            }
           }
           await Sint.find<AppHiveController>().writeProfileInfo();
         }

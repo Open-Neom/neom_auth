@@ -88,6 +88,9 @@ class GoogleAuthController extends SintController implements GoogleAuthService {
       GoogleSignInAccount? account = _activeAccount;
 
       if (account == null) {
+        try {
+          await _googleSignIn.signOut();
+        } catch (_) {}
         account = await _googleSignIn.authenticate(
           scopeHint: scopes ?? const <String>[],
         );
