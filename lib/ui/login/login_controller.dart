@@ -77,7 +77,7 @@ class LoginController extends SintController implements LoginService {
     }
     return _passwordFocusNode;
   }
-  Rx<AuthStatus> authStatus = AuthStatus.notDetermined.obs;
+  Rx<AuthStatus> authStatus = AuthStatus.waiting.obs;
 
   String _userId = "";
   final String _fbAccessToken = "";
@@ -263,12 +263,11 @@ class LoginController extends SintController implements LoginService {
             Sint.offAllNamed(nextRoute, arguments: nextArgs);
           } else {
             final currentRoute = Sint.currentRoute;
-            final isOnEntryPoint = currentRoute.isEmpty
-                || currentRoute == AppRouteConstants.root
-                || currentRoute == AppRouteConstants.login;
-            if (isOnEntryPoint) {
-              AppConfig.logger.i("User found for $_userId. Redirecting to Root Page");
+            if (currentRoute == AppRouteConstants.login) {
+              AppConfig.logger.i("User found for $_userId. Navigating to Root Page from Login Page");
               Sint.offAllNamed(AppRouteConstants.root);
+            } else if (currentRoute.isEmpty || currentRoute == AppRouteConstants.root) {
+              AppConfig.logger.i("User found for $_userId on root entry point. Updating reactive root state");
             } else {
               AppConfig.logger.i("User found for $_userId. Preserving deep-link route: $currentRoute");
             }
