@@ -106,6 +106,7 @@ class LoginController extends SintController implements LoginService {
     AppConfig.logger.t("onInit Login Controller");
     _authStateChangesSubscription = _auth.authStateChanges().listen((user) {
       _fbaUser.value = user;
+      handleAuthChanged(user);
     });
     _fbaUserSubscription = _fbaUser.listen(handleAuthChanged);
 
@@ -127,6 +128,14 @@ class LoginController extends SintController implements LoginService {
     super.onReady();
     AppConfig.logger.t("onReady Login Controller");
     isLoading.value = false;
+
+    // Fallback: If authStatus is still waiting after 1.2s, resolve initial auth state
+    Future.delayed(const Duration(milliseconds: 1200), () {
+      if (authStatus.value == AuthStatus.waiting) {
+        AppConfig.logger.i("AuthStatus fallback: resolving initial auth state from currentUser");
+        handleAuthChanged(_auth.currentUser);
+      }
+    });
   }
 
   @override
@@ -216,7 +225,7 @@ class LoginController extends SintController implements LoginService {
             case(SignedInWith.spotify):
               break;
             case(SignedInWith.notDetermined):
-              authStatus.value = AuthStatus.notDetermined;
+              authStatus.value = AuthStatus.notLoggedIn;
               break;
           }
         } else if(!userServiceImpl.isNewUser && userServiceImpl.user.profiles.isEmpty) {
