@@ -1,18 +1,19 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:sint/sint.dart';
 import 'package:neom_commons/utils/app_utilities.dart';
 import 'package:neom_commons/utils/constants/translations/message_translation_constants.dart';
 import 'package:neom_core/app_config.dart';
-import 'package:neom_core/utils/neom_error_logger.dart';
 import 'package:neom_core/data/firestore/constants/app_firestore_constants.dart';
 import 'package:neom_core/data/firestore/user_firestore.dart';
 import 'package:neom_core/domain/model/app_user.dart';
 import 'package:neom_core/domain/use_cases/login_service.dart';
 import 'package:neom_core/domain/use_cases/user_service.dart';
 import 'package:neom_core/utils/enums/signed_in_with.dart';
+import 'package:neom_core/utils/neom_error_logger.dart';
 import 'package:neom_core/utils/validator.dart';
+import 'package:sint/sint.dart';
+
 import '../../domain/use_cases/signup_service.dart';
 import '../../utils/constants/auth_translation_constants.dart';
 
@@ -74,7 +75,6 @@ class SignUpController extends SintController implements SignUpService {
     AppConfig.logger.d("Submitting Sign-up form");
 
     try {
-
       if(await validateInfo()) {
         setUserFromSignUp();
 
@@ -86,7 +86,6 @@ class SignUpController extends SintController implements SignUpService {
 
         loginServiceImpl.signedInWith = SignedInWith.signUp;
         loginServiceImpl.fbaUser = fbaUser;
-
       }
     } on FirebaseAuthException catch (e) {
       String fbAuthExceptionMsg = "";
@@ -119,21 +118,42 @@ class SignUpController extends SintController implements SignUpService {
     AppConfig.logger.d("Getting User Info From Sign-up text fields");
 
     try {
-      userServiceImpl.user =  AppUser(
+      userServiceImpl.user = buildUserFromSignUp(
         homeTown: AuthTranslationConstants.somewhereUniverse.tr,
-        photoUrl: "",
-        name: usernameController.text.trim(),
-        firstName: firstNameController.text.trim(),
-        lastName: lastNameController.text.trim(),
-        email: emailController.text.toLowerCase().trim(),
-        id: emailController.text.toLowerCase().trim(),
-        password: passwordController.text.trim(),
+        username: usernameController.text,
+        firstName: firstNameController.text,
+        lastName: lastNameController.text,
+        email: emailController.text,
       );
     } catch (e, st) {
       NeomErrorLogger.recordError(e, st, module: 'neom_auth', operation: 'setUserFromSignUp');
     }
 
     AppConfig.logger.d("User Info set: ${userServiceImpl.user.toString()}");
+  }
+
+  /// Builds the application profile for a newly authenticated Firebase user.
+  ///
+  /// The password is deliberately absent: it is submitted only to Firebase
+  /// Authentication and must never enter the persistable [AppUser] model.
+  @visibleForTesting
+  static AppUser buildUserFromSignUp({
+    required String homeTown,
+    required String username,
+    required String firstName,
+    required String lastName,
+    required String email,
+  }) {
+    final normalizedEmail = email.toLowerCase().trim();
+    return AppUser(
+      homeTown: homeTown,
+      photoUrl: "",
+      name: username.trim(),
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      email: normalizedEmail,
+      id: normalizedEmail,
+    );
   }
 
   @override

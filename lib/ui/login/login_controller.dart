@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart' as fba;
 import 'package:neom_core/utils/platform/core_io.dart';
+import 'package:neom_core/data/firestore/profile_document_locator.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:sint/sint.dart';
@@ -33,6 +34,23 @@ import '../../utils/constants/auth_translation_constants.dart';
 import '../../utils/enums/login_method.dart';
 
 class LoginController extends SintController implements LoginService {
+
+  static const Set<String> _webOAuthCancellationCodes = {
+    'popup-closed-by-user',
+    'cancelled-popup-request',
+    'canceled-popup-request',
+    'redirect-cancelled-by-user',
+    'redirect-canceled-by-user',
+    'web-context-canceled',
+    'user-cancelled',
+    'user-canceled',
+  };
+
+  static const Set<String> _webOAuthRedirectFallbackCodes = {
+    'popup-blocked',
+    'operation-not-supported-in-this-environment',
+    'web-storage-unsupported',
+  };
 
   final userServiceImpl = Sint.find<UserService>();
 
@@ -171,9 +189,33 @@ class LoginController extends SintController implements LoginService {
           signedInWith = SignedInWith.apple;
         }
       }
+    } on fba.FirebaseAuthException catch (e, st) {
+      if (_isWebOAuthCancellation(e)) {
+        AppConfig.logger.d('OAuth redirect was cancelled by the user.');
+        return;
+      }
+      NeomErrorLogger.recordError(e, st, module: 'neom_auth', operation: '_checkRedirectResult');
     } catch (e, st) {
       NeomErrorLogger.recordError(e, st, module: 'neom_auth', operation: '_checkRedirectResult');
     }
+  }
+
+  static String _normalizedFirebaseAuthCode(String code) {
+    return code.startsWith('auth/') ? code.substring(5) : code;
+  }
+
+  static bool _isWebOAuthCancellation(fba.FirebaseAuthException exception) {
+    return _webOAuthCancellationCodes.contains(
+      _normalizedFirebaseAuthCode(exception.code),
+    );
+  }
+
+  static bool _shouldFallbackToWebOAuthRedirect(
+    fba.FirebaseAuthException exception,
+  ) {
+    return _webOAuthRedirectFallbackCodes.contains(
+      _normalizedFirebaseAuthCode(exception.code),
+    );
   }
 
   @override
@@ -507,9 +549,19 @@ class LoginController extends SintController implements LoginService {
             authStatus.value = AuthStatus.loggedIn;
             signedInWith = SignedInWith.google;
           }
-        } catch (popupError) {
-          // Popup blocked (Safari ITP) or user closed popup — try redirect
-          AppConfig.logger.w('signInWithPopup failed, falling back to signInWithRedirect: $popupError');
+        } on fba.FirebaseAuthException catch (popupError) {
+          if (_isWebOAuthCancellation(popupError)) {
+            AppConfig.logger.d('Google popup was cancelled by the user.');
+            return;
+          }
+          if (!_shouldFallbackToWebOAuthRedirect(popupError)) {
+            rethrow;
+          }
+
+          AppConfig.logger.w(
+            'Google popup unavailable; falling back to redirect: '
+            '${popupError.code}',
+          );
           await _auth.signInWithRedirect(googleProvider);
           // Page will reload — getRedirectResult() in onInit handles the result
         }
@@ -522,6 +574,20 @@ class LoginController extends SintController implements LoginService {
           signedInWith = SignedInWith.google;
         }
       }
+    } on fba.FirebaseAuthException catch (e, st) {
+      if (_isWebOAuthCancellation(e)) {
+        AppConfig.logger.d('Google login was cancelled by the user.');
+        return;
+      }
+
+      _fbaUser.value = null;
+      authStatus.value = AuthStatus.notLoggedIn;
+      NeomErrorLogger.recordError(e, st, module: 'neom_auth', operation: 'googleLogin');
+
+      AppUtilities.showSnackBar(
+        title: MessageTranslationConstants.errorLoginGoogle.tr,
+        message: MessageTranslationConstants.errorLoginGoogle.tr,
+      );
     } catch (e, st) {
       _fbaUser.value = null;
       authStatus.value = AuthStatus.notLoggedIn;
@@ -538,6 +604,10 @@ class LoginController extends SintController implements LoginService {
 
   //TODO To Verify Implementation
   Future<void> googleLogout() async {
+    // Firebase Auth owns the web Google session. Initializing google_sign_in
+    // here would unnecessarily start the separate GSI/FedCM stack on logout.
+    if (kIsWeb || !Sint.isRegistered<GoogleAuthService>()) return;
+
     try {
       await Sint.find<GoogleAuthService>().signOut();
     } catch (e, st){
@@ -552,6 +622,14 @@ class LoginController extends SintController implements LoginService {
       await _auth.signOut();
       await googleLogout();
       clear();
+      userServiceImpl.user = AppUser();
+      userServiceImpl.profile = AppProfile();
+      AppConfig.instance
+        ..authStatus = AuthStatus.notLoggedIn
+        ..isGuestMode = true;
+      // Profile document paths are memoized per process; a new session must not
+      // inherit the previous user's resolved references.
+      ProfileDocumentLocator().clear();
       if(Sint.isRegistered<AudioHandlerService>()) {
         AudioHandlerService audioHandler = Sint.find<AudioHandlerService>();
         if(audioHandler.isPlaying) {
@@ -578,7 +656,7 @@ class LoginController extends SintController implements LoginService {
 
   void clear() {
     _fbaUser.value = null;
-    authStatus.value = AuthStatus.notDetermined;
+    authStatus.value = AuthStatus.notLoggedIn;
     isButtonDisabled.value = false;
 
     // SECURITY: Clear sensitive data from text controllers on logout
@@ -630,7 +708,7 @@ class LoginController extends SintController implements LoginService {
           final googleAuthService = Sint.find<GoogleAuthService>();
           final success = await googleAuthService.signIn();
           if (!success) {
-            AppConfig.logger.w("Google Sign-In was cancelled or failed");
+            AppConfig.logger.d("Google Sign-In was cancelled or unavailable");
             credentials = null;
             break;
           }

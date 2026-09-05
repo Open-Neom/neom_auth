@@ -1,15 +1,22 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:neom_core/app_config.dart';
 import 'package:neom_core/cloud_properties.dart';
 import 'package:neom_core/domain/use_cases/google_auth_service.dart';
 import 'package:neom_core/utils/neom_error_logger.dart';
 import 'package:neom_core/utils/platform/core_io.dart';
-import 'package:flutter/foundation.dart';
 import 'package:sint/sint.dart';
 
 class GoogleAuthController extends SintController implements GoogleAuthService {
-  static bool _initializedGoogleSignInOnce = false;
+  static Future<void>? _googleSignInInitialization;
+
   final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
+  StreamSubscription<GoogleSignInAuthenticationEvent>?
+  _authenticationEventsSubscription;
+  Future<void>? _ready;
+
   GoogleSignInAccount? _currentUser;
   GoogleSignInAuthentication? _authCreds;
 
@@ -17,50 +24,123 @@ class GoogleAuthController extends SintController implements GoogleAuthService {
   void onInit() {
     super.onInit();
     AppConfig.logger.t("onInit GoogleAuthController (neom_auth)");
-    _initializeGoogleSignIn();
-
-    // Track current user changes via authenticationEvents stream
-    _googleSignIn.authenticationEvents.listen((event) {
-      if (event is GoogleSignInAuthenticationEventSignIn) {
-        _currentUser = event.user;
-        _authCreds = event.user.authentication;
-      } else if (event is GoogleSignInAuthenticationEventSignOut) {
-        _currentUser = null;
-        _authCreds = null;
-      }
-      update();
-    });
-
-    // Try to silently sign in on startup to restore the session
-    _googleSignIn.attemptLightweightAuthentication()?.then((account) {
-      if (account != null) {
-        _currentUser = account;
-        _authCreds = account.authentication;
-        AppConfig.logger.d("GoogleAuthController: Silently signed in as ${account.email}");
-        update();
-      }
-    }).catchError((e) {
-      AppConfig.logger.w("Failed silent Google Sign In: $e");
-    });
   }
 
-  void _initializeGoogleSignIn() {
-    if (_initializedGoogleSignInOnce) {
-      AppConfig.logger.d("GoogleAuthController: Google Sign In already initialized, skipping.");
+  Future<void> _ensureReady() {
+    return _ready ??= _initializeAndSubscribe();
+  }
+
+  Future<void> _initializeAndSubscribe() async {
+    await (_googleSignInInitialization ??= _initializeGoogleSignIn(
+      _googleSignIn,
+    ));
+
+    if (isClosed) return;
+
+    _authenticationEventsSubscription ??= _googleSignIn.authenticationEvents
+        .listen(
+          _handleAuthenticationEvent,
+          onError: _handleAuthenticationError,
+        );
+  }
+
+  static Future<void> _initializeGoogleSignIn(GoogleSignIn googleSignIn) async {
+    if (kIsWeb) {
+      await googleSignIn.initialize(clientId: CloudProperties.getWebCliendId());
+    } else if (Platform.isAndroid) {
+      await googleSignIn.initialize(
+        serverClientId: CloudProperties.getServerCliendId(),
+      );
+    } else {
+      await googleSignIn.initialize();
+    }
+  }
+
+  void _handleAuthenticationEvent(GoogleSignInAuthenticationEvent event) {
+    if (event is GoogleSignInAuthenticationEventSignIn) {
+      _setCurrentUser(event.user);
+    } else if (event is GoogleSignInAuthenticationEventSignOut) {
+      _clearCurrentUser();
+    }
+    update();
+  }
+
+  void _handleAuthenticationError(Object error, StackTrace stackTrace) {
+    if (error is GoogleSignInException && _isExpectedCancellation(error)) {
+      AppConfig.logger.d(
+        'GoogleAuthController: Google authentication cancelled.',
+      );
       return;
     }
+
+    AppConfig.logger.w(
+      'GoogleAuthController: authentication event failed: $error',
+    );
+    NeomErrorLogger.recordError(
+      error,
+      stackTrace,
+      module: 'neom_auth',
+      operation: 'googleAuthenticationEvent',
+    );
+  }
+
+  void _setCurrentUser(GoogleSignInAccount account) {
+    _currentUser = account;
+    _authCreds = account.authentication;
+  }
+
+  void _clearCurrentUser() {
+    _currentUser = null;
+    _authCreds = null;
+  }
+
+  bool get _canRestoreMobileSession =>
+      !kIsWeb &&
+      !AppConfig.instance.isGuestMode &&
+      (Platform.isAndroid || Platform.isIOS || Platform.isMacOS);
+
+  Future<GoogleSignInAccount?> _restoreMobileSession() async {
+    if (!_canRestoreMobileSession) return null;
+
     try {
-      if (kIsWeb) {
-        _googleSignIn.initialize(clientId: CloudProperties.getWebCliendId());
-      } else if (Platform.isAndroid) {
-        _googleSignIn.initialize(serverClientId: CloudProperties.getServerCliendId());
-      } else if (Platform.isIOS || Platform.isMacOS) {
-        _googleSignIn.initialize();
+      final authentication = _googleSignIn.attemptLightweightAuthentication();
+      final account = authentication == null ? null : await authentication;
+      if (account != null) {
+        _setCurrentUser(account);
+        AppConfig.logger.d(
+          'GoogleAuthController: restored Google session for ${account.email}',
+        );
+        update();
       }
-      _initializedGoogleSignInOnce = true;
+      return account;
+    } on GoogleSignInException catch (e, st) {
+      if (_isExpectedCancellation(e)) return null;
+      NeomErrorLogger.recordError(
+        e,
+        st,
+        module: 'neom_auth',
+        operation: 'restoreGoogleSession',
+      );
+      return null;
     } catch (e, st) {
-      AppConfig.logger.e("Failed to initialize Google Sign In: $e");
-      NeomErrorLogger.recordError(e, st, module: 'neom_auth', operation: 'initializeGoogleSignIn');
+      NeomErrorLogger.recordError(
+        e,
+        st,
+        module: 'neom_auth',
+        operation: 'restoreGoogleSession',
+      );
+      return null;
+    }
+  }
+
+  static bool _isExpectedCancellation(GoogleSignInException exception) {
+    switch (exception.code) {
+      case GoogleSignInExceptionCode.canceled:
+      case GoogleSignInExceptionCode.interrupted:
+      case GoogleSignInExceptionCode.uiUnavailable:
+        return true;
+      default:
+        return false;
     }
   }
 
@@ -85,7 +165,10 @@ class GoogleAuthController extends SintController implements GoogleAuthService {
   Future<bool> signIn({List<String>? scopes}) async {
     AppConfig.logger.d('GoogleAuthController (neom_auth): signIn...');
     try {
+      await _ensureReady();
+
       GoogleSignInAccount? account = _activeAccount;
+      account ??= await _restoreMobileSession();
 
       if (account == null) {
         try {
@@ -96,31 +179,44 @@ class GoogleAuthController extends SintController implements GoogleAuthService {
         );
       }
 
-      if (account == null) {
-        AppConfig.logger.w('GoogleAuthController (neom_auth): no account selected');
-        return false;
-      }
-
-      _currentUser = account;
-      _authCreds = account.authentication;
+      _setCurrentUser(account);
 
       // Check and request incremental scopes if specified
       if (scopes != null && scopes.isNotEmpty) {
-        var authz = await account.authorizationClient.authorizationForScopes(scopes);
+        var authz = await account.authorizationClient.authorizationForScopes(
+          scopes,
+        );
         if (authz == null) {
-          AppConfig.logger.d('GoogleAuthController (neom_auth): requesting scopes: $scopes');
-          authz = await account.authorizationClient.authorizeScopes(scopes);
-        }
-        if (authz == null) {
-          AppConfig.logger.e('GoogleAuthController (neom_auth): failed to authorize scopes');
-          return false;
+          AppConfig.logger.d(
+            'GoogleAuthController (neom_auth): requesting scopes: $scopes',
+          );
+          await account.authorizationClient.authorizeScopes(scopes);
         }
       }
 
       update();
       return true;
+    } on GoogleSignInException catch (e, st) {
+      if (_isExpectedCancellation(e)) {
+        AppConfig.logger.d(
+          'GoogleAuthController: interactive Google sign-in cancelled.',
+        );
+        return false;
+      }
+      NeomErrorLogger.recordError(
+        e,
+        st,
+        module: 'neom_auth',
+        operation: 'signIn',
+      );
+      return false;
     } catch (e, st) {
-      NeomErrorLogger.recordError(e, st, module: 'neom_auth', operation: 'signIn');
+      NeomErrorLogger.recordError(
+        e,
+        st,
+        module: 'neom_auth',
+        operation: 'signIn',
+      );
       return false;
     }
   }
@@ -129,36 +225,66 @@ class GoogleAuthController extends SintController implements GoogleAuthService {
   Future<void> signOut() async {
     AppConfig.logger.d('GoogleAuthController (neom_auth): signOut...');
     try {
+      await _ensureReady();
       await _googleSignIn.signOut();
-      _currentUser = null;
-      _authCreds = null;
+      _clearCurrentUser();
       update();
     } catch (e, st) {
-      NeomErrorLogger.recordError(e, st, module: 'neom_auth', operation: 'signOut');
+      NeomErrorLogger.recordError(
+        e,
+        st,
+        module: 'neom_auth',
+        operation: 'signOut',
+      );
     }
   }
 
   @override
   Future<bool> refreshToken({List<String>? scopes}) async {
     AppConfig.logger.d('GoogleAuthController (neom_auth): refreshToken...');
+
+    // On web this method can invoke FedCM/One Tap UI without a user gesture.
+    // Guests must also remain free of implicit auth prompts.
+    if (kIsWeb || AppConfig.instance.isGuestMode) return false;
+
     try {
-      final account = await _googleSignIn.attemptLightweightAuthentication();
+      await _ensureReady();
+      final account = await _restoreMobileSession();
       if (account == null) return false;
 
-      _currentUser = account;
-      _authCreds = account.authentication;
+      _setCurrentUser(account);
       update();
       return true;
+    } on GoogleSignInException catch (e, st) {
+      if (_isExpectedCancellation(e)) return false;
+      NeomErrorLogger.recordError(
+        e,
+        st,
+        module: 'neom_auth',
+        operation: 'refreshToken',
+      );
+      return false;
     } catch (e, st) {
-      NeomErrorLogger.recordError(e, st, module: 'neom_auth', operation: 'refreshToken');
+      NeomErrorLogger.recordError(
+        e,
+        st,
+        module: 'neom_auth',
+        operation: 'refreshToken',
+      );
       return false;
     }
   }
 
   @override
-  Future<String?> getValidAccessToken({List<String>? scopes, bool forceRefresh = false}) async {
+  Future<String?> getValidAccessToken({
+    List<String>? scopes,
+    bool forceRefresh = false,
+  }) async {
     try {
+      await _ensureReady();
+
       GoogleSignInAccount? account = _activeAccount;
+      account ??= await _restoreMobileSession();
 
       if (account == null && forceRefresh) {
         final success = await signIn(scopes: scopes);
@@ -170,16 +296,33 @@ class GoogleAuthController extends SintController implements GoogleAuthService {
       if (account == null) return null;
 
       // Request or check authorization for the scopes using authorizationClient
-      final List<String> targetScopes = scopes ?? const <String>['email', 'profile'];
-      var authz = await account.authorizationClient.authorizationForScopes(targetScopes);
+      final List<String> targetScopes =
+          scopes ?? const <String>['email', 'profile'];
+      var authz = await account.authorizationClient.authorizationForScopes(
+        targetScopes,
+      );
       if (authz == null && forceRefresh) {
         authz = await account.authorizationClient.authorizeScopes(targetScopes);
       }
       return authz?.accessToken;
     } catch (e, st) {
-      NeomErrorLogger.recordError(e, st, module: 'neom_auth', operation: 'getValidAccessToken');
+      NeomErrorLogger.recordError(
+        e,
+        st,
+        module: 'neom_auth',
+        operation: 'getValidAccessToken',
+      );
       return null;
     }
   }
-}
 
+  @override
+  void onClose() {
+    final subscription = _authenticationEventsSubscription;
+    _authenticationEventsSubscription = null;
+    if (subscription != null) {
+      unawaited(subscription.cancel());
+    }
+    super.onClose();
+  }
+}
