@@ -1,9 +1,12 @@
-import 'package:neom_auth/utils/constants/auth_translation_constants.dart';
+import '../../utils/constants/auth_translation_constants.dart';
 
 class AuthFrTranslations {
 
   static const Map<String, String> values = {
     AuthTranslationConstants.accountSignUp: 'Créer un compte',
+    AuthTranslationConstants.accountLoadErrorTitle: 'Impossible de charger votre compte',
+    AuthTranslationConstants.accountLoadErrorMessage: 'L\'authentification a réussi, mais nous n\'avons pas pu charger les informations de votre compte. Ne vous réinscrivez pas pour résoudre cette erreur. Réessayez ou explorez l\'application en tant qu\'invité.',
+    AuthTranslationConstants.retryAccountLoad: 'Réessayer de charger le compte',
     AuthTranslationConstants.confirmPassword: 'Confirmer le mot de passe',
     AuthTranslationConstants.dontHaveAnAccount: 'Vous n\'avez pas de compte ? ',
     AuthTranslationConstants.emailNotFound: 'L\'adresse e-mail fournie n\'est associée à aucun compte.',

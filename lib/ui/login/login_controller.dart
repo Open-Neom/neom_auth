@@ -1,39 +1,43 @@
 import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart' as fba;
-import 'package:neom_core/utils/platform/core_io.dart';
-import 'package:neom_core/data/firestore/profile_document_locator.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:sint/sint.dart';
-import 'package:neom_core/domain/use_cases/google_auth_service.dart';
 import 'package:neom_commons/utils/app_utilities.dart';
+import 'package:neom_commons/utils/auth_guard.dart';
 import 'package:neom_commons/utils/constants/translations/message_translation_constants.dart';
 import 'package:neom_commons/utils/device_utilities.dart';
 import 'package:neom_commons/utils/security_utilities.dart';
-import 'package:neom_commons/utils/auth_guard.dart';
 import 'package:neom_core/app_config.dart';
-import 'package:neom_core/utils/enums/app_in_use.dart';
-import 'package:neom_core/utils/neom_error_logger.dart';
-import 'package:neom_core/utils/neom_flow_tracker.dart';
-import 'package:neom_core/cloud_properties.dart';
 import 'package:neom_core/data/firestore/constants/app_firestore_constants.dart';
+import 'package:neom_core/data/firestore/profile_document_locator.dart';
 import 'package:neom_core/data/firestore/profile_firestore.dart';
 import 'package:neom_core/data/implementations/app_hive_controller.dart';
+import 'package:neom_core/domain/model/account_load_exception.dart';
 import 'package:neom_core/domain/model/app_profile.dart';
 import 'package:neom_core/domain/model/app_user.dart';
 import 'package:neom_core/domain/use_cases/audio_handler_service.dart';
+import 'package:neom_core/domain/use_cases/google_auth_service.dart';
 import 'package:neom_core/domain/use_cases/login_service.dart';
 import 'package:neom_core/domain/use_cases/user_service.dart';
 import 'package:neom_core/utils/constants/app_route_constants.dart';
+import 'package:neom_core/utils/enums/app_in_use.dart';
 import 'package:neom_core/utils/enums/auth_status.dart';
 import 'package:neom_core/utils/enums/signed_in_with.dart';
+import 'package:neom_core/utils/neom_error_logger.dart';
+import 'package:neom_core/utils/neom_flow_tracker.dart';
+import 'package:neom_core/utils/platform/core_io.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
+import 'package:sint/sint.dart';
 
 import '../../utils/constants/auth_translation_constants.dart';
 import '../../utils/enums/login_method.dart';
 
 class LoginController extends SintController implements LoginService {
+
+  LoginController({UserService? userService, fba.FirebaseAuth? firebaseAuth})
+      : userServiceImpl = userService ?? Sint.find<UserService>(),
+        _auth = firebaseAuth ?? fba.FirebaseAuth.instance;
 
   static const Set<String> _webOAuthCancellationCodes = {
     'popup-closed-by-user',
@@ -52,7 +56,7 @@ class LoginController extends SintController implements LoginService {
     'web-storage-unsupported',
   };
 
-  final userServiceImpl = Sint.find<UserService>();
+  final UserService userServiceImpl;
 
   TextEditingController _emailController = TextEditingController();
   TextEditingController _passwordController = TextEditingController();
@@ -101,9 +105,12 @@ class LoginController extends SintController implements LoginService {
   final String _fbAccessToken = "";
   fba.AuthCredential? credentials;
 
-  fba.FirebaseAuth _auth = fba.FirebaseAuth.instance;
+  fba.FirebaseAuth _auth;
   final Rxn<fba.User> _fbaUser = Rxn<fba.User>();
+  // Retained for the permanent controller; see onClose's lifetime contract.
+  // ignore: unused_field
   StreamSubscription<fba.User?>? _authStateChangesSubscription;
+  // ignore: unused_field
   StreamSubscription<fba.User?>? _fbaUserSubscription;
 
   SignedInWith _signedInWith = SignedInWith.notDetermined;
@@ -111,12 +118,14 @@ class LoginController extends SintController implements LoginService {
   
   final RxBool isLoading = true.obs;
   final RxBool isButtonDisabled = false.obs;
+  final RxBool hasAccountLoadError = false.obs;
 
   bool isPhoneAuth = false;
   String phoneVerificationId = '';
 
   bool isAppleSignInAvailable = false;
   bool _isProcessingAuth = false;
+  bool _accountLookupConfirmedMissing = false;
 
   @override
   void onInit() {
@@ -177,9 +186,7 @@ class LoginController extends SintController implements LoginService {
     try {
       final result = await _auth.getRedirectResult();
       if (result.user != null) {
-        AppConfig.logger.i('OAuth redirect result received for: ${result.user?.email}');
-        _fbaUser.value = result.user;
-        authStatus.value = AuthStatus.loggedIn;
+        AppConfig.logger.i('OAuth redirect result received');
 
         // Determine sign-in provider
         final providerId = result.credential?.providerId ?? '';
@@ -188,6 +195,7 @@ class LoginController extends SintController implements LoginService {
         } else if (providerId.contains('apple')) {
           signedInWith = SignedInWith.apple;
         }
+        _fbaUser.value = result.user;
       }
     } on fba.FirebaseAuthException catch (e, st) {
       if (_isWebOAuthCancellation(e)) {
@@ -227,7 +235,9 @@ class LoginController extends SintController implements LoginService {
       return;
     }
     _isProcessingAuth = true; // Bloqueamos
-    AppConfig.logger.d("handleAuthChanged - Procesando para user: ${user?.uid}");
+    AppConfig.logger.d('Processing authentication state');
+    _accountLookupConfirmedMissing = false;
+    hasAccountLoadError.value = false;
     NeomFlowTracker.startFlow('login');
     authStatus.value = AuthStatus.waiting;
 
@@ -240,9 +250,10 @@ class LoginController extends SintController implements LoginService {
         authStatus.value = AuthStatus.notLoggedIn;
         user = _auth.currentUser!;
       } else if(user != null) {
+        final registrationDraft = userServiceImpl.user;
         if(user.providerData.isNotEmpty) {
           // Priorizar email sobre providerData.uid ya que los userId modernos son emails
-          String? email = user.providerData.first.email ?? user.email;
+          String? email = user.email ?? user.providerData.first.email;
           if(email?.isNotEmpty ?? false) {
             _userId = email!;
             await userServiceImpl.setUserByEmail(email);
@@ -250,13 +261,23 @@ class LoginController extends SintController implements LoginService {
             _userId = user.providerData.first.uid!;
             await userServiceImpl.setUserById(_userId);
           }
+          _accountLookupConfirmedMissing = userServiceImpl.isNewUser &&
+              userServiceImpl.user.id.isEmpty;
+        } else {
+          throw const AccountLoadException();
         }
 
         if(userServiceImpl.user.id.isEmpty) {
-          AppConfig.logger.d("User not found in Firestore for $_userId.");
+          if (!_accountLookupConfirmedMissing) throw const AccountLoadException();
+          AppConfig.logger.d('Account lookup completed without a matching account');
           switch(signedInWith) {
             case(SignedInWith.signUp):
-              gotoIntroPage();
+              if (registrationDraft.id.isNotEmpty &&
+                  registrationDraft.email == user.email) {
+                userServiceImpl.user = registrationDraft;
+              } else {
+                userServiceImpl.getUserFromFirebase(user);
+              }
               break;
             case(SignedInWith.email):
             case(SignedInWith.google):
@@ -271,8 +292,7 @@ class LoginController extends SintController implements LoginService {
               break;
           }
         } else if(!userServiceImpl.isNewUser && userServiceImpl.user.profiles.isEmpty) {
-          AppConfig.logger.i("No Profiles found for $_userId. Please Login Again");
-          authStatus.value = AuthStatus.notLoggedIn;
+          throw const AccountLoadException();
         } else {
           authStatus.value = AuthStatus.loggedIn;
           AppConfig.instance.isGuestMode = false;
@@ -292,7 +312,7 @@ class LoginController extends SintController implements LoginService {
           await Sint.find<AppHiveController>().writeProfileInfo();
         }
 
-        if(userServiceImpl.isNewUser && userServiceImpl.user.id.isNotEmpty) {
+        if(_accountLookupConfirmedMissing && userServiceImpl.isNewUser && userServiceImpl.user.id.isNotEmpty) {
           NeomFlowTracker.endFlow('login');
           NeomFlowTracker.startFlow('registration');
           gotoIntroPage();
@@ -325,7 +345,19 @@ class LoginController extends SintController implements LoginService {
           }
         }
       }
+    } on AccountLoadException {
+      // An authenticated identity is not yet a loaded application account.
+      // Keep writes disabled and make retry explicit instead of onboarding.
+      authStatus.value = AuthStatus.notLoggedIn;
+      AppConfig.instance.isGuestMode = true;
+      hasAccountLoadError.value = true;
+      NeomFlowTracker.endFlow('login', success: false);
+      AppConfig.logger.w('Account loading failed; registration was not started');
+      if (Sint.currentRoute != AppRouteConstants.login) {
+        Sint.offAllNamed(AppRouteConstants.login);
+      }
     } catch (e, st) {
+      authStatus.value = AuthStatus.notLoggedIn;
       NeomFlowTracker.endFlow('login', success: false);
       NeomErrorLogger.recordError(e, st, module: 'neom_auth', operation: 'handleAuthChanged');
       AppUtilities.showSnackBar(
@@ -342,8 +374,15 @@ class LoginController extends SintController implements LoginService {
     update();
   }
 
+  Future<void> retryAccountLoad() async {
+    if (_isProcessingAuth) return;
+    isLoading.value = true;
+    await handleAuthChanged(_auth.currentUser);
+  }
+
   void gotoIntroPage() {
-    AppConfig.logger.i("New User found for $_userId. Redirecting to Intro Page");
+    if (!_accountLookupConfirmedMissing) return;
+    AppConfig.logger.i('Confirmed new account; redirecting to registration');
     authStatus.value = AuthStatus.loggedIn;
 
     // SAIA OAuth: skip full onboarding, create account directly
@@ -416,7 +455,7 @@ class LoginController extends SintController implements LoginService {
 
   @override
   Future<void> emailLogin() async {
-
+    signedInWith = SignedInWith.email;
     fba.User? emailUser;
     try {
       fba.UserCredential userCredential = await _auth.signInWithEmailAndPassword(
@@ -427,8 +466,6 @@ class LoginController extends SintController implements LoginService {
        if(userCredential.user != null) {
          emailUser = userCredential.user;
          _fbaUser.value = emailUser;
-         authStatus.value = AuthStatus.loggedIn;
-         signedInWith = SignedInWith.email;
        }
     } on fba.FirebaseAuthException catch (e, st) {
       NeomErrorLogger.recordError(e, st, module: 'neom_auth', operation: 'emailLogin');
@@ -472,6 +509,7 @@ class LoginController extends SintController implements LoginService {
   @override
   Future<void> appleLogin() async {
     AppConfig.logger.d("Entering Logging Method with Apple Account");
+    signedInWith = SignedInWith.apple;
 
     try {
       if (kIsWeb) {
@@ -484,8 +522,6 @@ class LoginController extends SintController implements LoginService {
           final result = await _auth.signInWithPopup(appleProvider);
           if (result.user != null) {
             _fbaUser.value = result.user;
-            authStatus.value = AuthStatus.loggedIn;
-            signedInWith = SignedInWith.apple;
           }
         } catch (popupError) {
           AppConfig.logger.w('signInWithPopup failed for Apple, falling back to signInWithRedirect: $popupError');
@@ -497,8 +533,6 @@ class LoginController extends SintController implements LoginService {
         if(credentials != null) {
           fba.UserCredential userCredential = await _auth.signInWithCredential(credentials!);
           _fbaUser.value = userCredential.user;
-          authStatus.value = AuthStatus.loggedIn;
-          signedInWith = SignedInWith.apple;
         }
       }
 
@@ -535,6 +569,7 @@ class LoginController extends SintController implements LoginService {
   Future<void> googleLogin() async {
 
     AppConfig.logger.i("Entering Logging Method with Google Account");
+    signedInWith = SignedInWith.google;
 
     try {
       if (kIsWeb) {
@@ -546,8 +581,6 @@ class LoginController extends SintController implements LoginService {
           final result = await _auth.signInWithPopup(googleProvider);
           if (result.user != null) {
             _fbaUser.value = result.user;
-            authStatus.value = AuthStatus.loggedIn;
-            signedInWith = SignedInWith.google;
           }
         } on fba.FirebaseAuthException catch (popupError) {
           if (_isWebOAuthCancellation(popupError)) {
@@ -570,8 +603,6 @@ class LoginController extends SintController implements LoginService {
 
         if(credentials != null) {
           _fbaUser.value = (await _auth.signInWithCredential(credentials!)).user;
-          authStatus.value = AuthStatus.loggedIn;
-          signedInWith = SignedInWith.google;
         }
       }
     } on fba.FirebaseAuthException catch (e, st) {
@@ -837,6 +868,7 @@ class LoginController extends SintController implements LoginService {
   @override
   void loginAsGuest() {
     AppConfig.logger.d("Entering as Guest");
+    hasAccountLoadError.value = false;
     AppConfig.instance.isGuestMode = true;
     userServiceImpl.user = AppUser();
     userServiceImpl.profile = AppProfile();

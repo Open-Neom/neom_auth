@@ -16,6 +16,9 @@ class AuthTranslationConstants {
   static const String accountSignUp = 'accountSignUp';
 
   // Login errors
+  static const String accountLoadErrorTitle = 'accountLoadErrorTitle';
+  static const String accountLoadErrorMessage = 'accountLoadErrorMessage';
+  static const String retryAccountLoad = 'retryAccountLoad';
   static const String loginError = 'loginError';
   static const String loginFailed = 'loginFailed';
 }

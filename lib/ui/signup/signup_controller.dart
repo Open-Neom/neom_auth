@@ -77,6 +77,8 @@ class SignUpController extends SintController implements SignUpService {
     try {
       if(await validateInfo()) {
         setUserFromSignUp();
+        // Auth listeners can fire before the credential future completes.
+        loginServiceImpl.signedInWith = SignedInWith.signUp;
 
         User? fbaUser = (await loginServiceImpl.auth
             .createUserWithEmailAndPassword(

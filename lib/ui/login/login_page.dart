@@ -1,8 +1,5 @@
 import 'package:flutter/foundation.dart';
-import 'package:neom_core/app_properties.dart';
-import 'package:neom_core/utils/platform/core_io.dart';
 import 'package:flutter/material.dart';
-import 'package:sint/sint.dart';
 import 'package:neom_commons/app_flavour.dart';
 import 'package:neom_commons/ui/theme/app_color.dart';
 import 'package:neom_commons/ui/theme/app_theme.dart';
@@ -11,8 +8,13 @@ import 'package:neom_commons/ui/widgets/header_intro.dart';
 import 'package:neom_commons/utils/constants/app_page_id_constants.dart';
 import 'package:neom_commons/utils/constants/translations/app_translation_constants.dart';
 import 'package:neom_core/app_config.dart';
+import 'package:neom_core/app_properties.dart';
 import 'package:neom_core/utils/constants/core_constants.dart';
+import 'package:neom_core/utils/platform/core_io.dart';
+import 'package:sint/sint.dart';
+
 import '../../utils/constants/auth_translation_constants.dart';
+import '../widgets/account_load_error_notice.dart';
 import '../widgets/login_widgets.dart';
 import 'login_controller.dart';
 
@@ -130,6 +132,13 @@ class LoginPage extends StatelessWidget {
                             ],
 
                             const SizedBox(height: 24),
+
+                            if (controller.hasAccountLoadError.value) ...[
+                              AccountLoadErrorNotice(
+                                onRetry: controller.retryAccountLoad,
+                              ),
+                              const SizedBox(height: 20),
+                            ],
 
                             // Form fields — Tab key cycles through these in order
                             FocusTraversalGroup(
@@ -255,6 +264,12 @@ class LoginPage extends StatelessWidget {
                       ),
                     ),
                     AppTheme.heightSpace10,
+                    if (controller.hasAccountLoadError.value) ...[
+                      AccountLoadErrorNotice(
+                        onRetry: controller.retryAccountLoad,
+                      ),
+                      AppTheme.heightSpace10,
+                    ],
                     buildEmailTF(controller),
                     AppTheme.heightSpace10,
                     buildPasswordTF(controller),

@@ -1,9 +1,12 @@
-import 'package:neom_auth/utils/constants/auth_translation_constants.dart';
+import '../../utils/constants/auth_translation_constants.dart';
 
 class AuthEnTranslations {
 
   static const Map<String, String> values = {
     AuthTranslationConstants.accountSignUp: 'Account Sign Up',
+    AuthTranslationConstants.accountLoadErrorTitle: 'Unable to load your account',
+    AuthTranslationConstants.accountLoadErrorMessage: 'Authentication succeeded, but we couldn\'t load your account information. Don\'t sign up again to resolve this error. Retry or explore as a guest.',
+    AuthTranslationConstants.retryAccountLoad: 'Retry loading account',
     AuthTranslationConstants.confirmPassword: 'Confirm password',
     AuthTranslationConstants.dontHaveAnAccount: 'Don\'t have an account? ',
     AuthTranslationConstants.emailNotFound: 'The provided email is not associated with any account.',
