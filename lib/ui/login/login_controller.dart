@@ -249,6 +249,19 @@ class LoginController extends SintController implements LoginService {
       } else if(user == null && _auth.currentUser != null) {
         authStatus.value = AuthStatus.notLoggedIn;
         user = _auth.currentUser!;
+      } else if(user != null && user.isAnonymous) {
+        // Sesión anónima: es el invitado, no una cuenta rota.
+        //
+        // Un usuario anónimo tiene `providerData` vacío, y la rama de abajo
+        // lo trataba como identidad sin cuenta cargable: lanzaba
+        // AccountLoadException y de ahí a /login con «No se pudo cargar tu
+        // cuenta». Antes no pasaba porque no existían usuarios anónimos;
+        // al habilitar el proveedor, este fallo latente despertó y se
+        // llevaba al invitado al login en cuanto el estado de auth
+        // cambiaba. El invitado se queda donde está, en modo invitado.
+        authStatus.value = AuthStatus.notLoggedIn;
+        AppConfig.instance.isGuestMode = true;
+        AppConfig.logger.d('Sesión anónima detectada: se mantiene el modo invitado');
       } else if(user != null) {
         final registrationDraft = userServiceImpl.user;
         if(user.providerData.isNotEmpty) {

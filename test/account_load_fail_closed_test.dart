@@ -37,10 +37,32 @@ class _FirebaseUser extends Fake implements fba.User {
   final String provider;
   @override
   String get uid => 'auth-id';
+  // Estos usuarios modelan cuentas reales con proveedor. El controlador
+  // ahora pregunta `isAnonymous` antes de buscar la cuenta, y un Fake sin
+  // esto lanza UnimplementedError en cada test.
+  @override
+  bool get isAnonymous => false;
   @override
   List<fba.UserInfo> get providerData => [
     _Provider(provider, providerEmail ?? email),
   ];
+  @override
+  String? get displayName => null;
+  @override
+  String? get photoURL => null;
+}
+
+/// Usuario anónimo: `isAnonymous` verdadero y `providerData` vacío, que es
+/// exactamente lo que Firebase entrega tras `signInAnonymously()`.
+class _AnonymousUser extends Fake implements fba.User {
+  @override
+  String get uid => 'anon-id';
+  @override
+  bool get isAnonymous => true;
+  @override
+  List<fba.UserInfo> get providerData => const [];
+  @override
+  String? get email => null;
   @override
   String? get displayName => null;
   @override
@@ -183,6 +205,28 @@ void main() {
       },
     );
   }
+
+  testWidgets('anonymous session stays a guest and never reaches login', (
+    tester,
+  ) async {
+    // Un usuario anónimo tiene providerData vacío, y la rama de cuenta lo
+    // trataba como identidad rota: AccountLoadException y de ahí a /login
+    // con «No se pudo cargar tu cuenta». Antes no pasaba porque no existían
+    // usuarios anónimos; al habilitar el proveedor, este fallo latente
+    // despertó y se llevaba al invitado al login en cuanto el estado de
+    // auth cambiaba.
+    auth = _Auth(_AnonymousUser());
+    await mount(tester, route: AppRouteConstants.root);
+    await controller.handleAuthChanged(auth.currentUser);
+    await tester.pumpAndSettle();
+    expect(Sint.currentRoute, AppRouteConstants.root);
+    expect(controller.hasAccountLoadError.value, isFalse);
+    expect(controller.authStatus.value, AuthStatus.notLoggedIn);
+    expect(AppConfig.instance.isGuestMode, isTrue);
+    expect(service.lookups, isEmpty,
+        reason: 'un anónimo no tiene cuenta que buscar');
+    expect(controller.introCalls, 0);
+  });
 
   testWidgets('session restoration failure navigates to recoverable login', (
     tester,
