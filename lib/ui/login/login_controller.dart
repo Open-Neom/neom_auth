@@ -265,13 +265,14 @@ class LoginController extends SintController implements LoginService {
       } else if(user != null) {
         final registrationDraft = userServiceImpl.user;
         if(user.providerData.isNotEmpty) {
-          // Priorizar email sobre providerData.uid ya que los userId modernos son emails
+          // Find legacy accounts by the authenticated email without changing
+          // their document IDs. New accounts use the Firebase Auth UID.
           String? email = user.email ?? user.providerData.first.email;
           if(email?.isNotEmpty ?? false) {
             _userId = email!;
             await userServiceImpl.setUserByEmail(email);
           } else {
-            _userId = user.providerData.first.uid!;
+            _userId = user.uid;
             await userServiceImpl.setUserById(_userId);
           }
           _accountLookupConfirmedMissing = userServiceImpl.isNewUser &&
@@ -285,8 +286,11 @@ class LoginController extends SintController implements LoginService {
           AppConfig.logger.d('Account lookup completed without a matching account');
           switch(signedInWith) {
             case(SignedInWith.signUp):
-              if (registrationDraft.id.isNotEmpty &&
+              if (registrationDraft.email.isNotEmpty &&
                   registrationDraft.email == user.email) {
+                // The pre-auth draft deliberately has no identity. Only bind
+                // it after the server has confirmed there is no account.
+                registrationDraft.id = user.uid;
                 userServiceImpl.user = registrationDraft;
               } else {
                 userServiceImpl.getUserFromFirebase(user);
@@ -473,7 +477,7 @@ class LoginController extends SintController implements LoginService {
     try {
       fba.UserCredential userCredential = await _auth.signInWithEmailAndPassword(
         email: emailController.text.trim(),
-        password: passwordController.text.trim()
+        password: passwordController.text
       );
 
        if(userCredential.user != null) {
@@ -718,7 +722,7 @@ class LoginController extends SintController implements LoginService {
         case(LoginMethod.email):
           credentials = fba.EmailAuthProvider.credential(
               email: emailController.text.trim(),
-              password: passwordController.text.trim()
+              password: passwordController.text
           );
           break;
         case(LoginMethod.facebook):

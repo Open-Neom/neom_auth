@@ -30,13 +30,14 @@ class _FirebaseUser extends Fake implements fba.User {
     this.email = 'owner@example.test',
     this.providerEmail,
     this.provider = 'google.com',
+    this.uid = 'auth-id',
   });
   @override
   final String? email;
   final String? providerEmail;
   final String provider;
   @override
-  String get uid => 'auth-id';
+  final String uid;
   // Estos usuarios modelan cuentas reales con proveedor. El controlador
   // ahora pregunta `isAnonymous` antes de buscar la cuenta, y un Fake sin
   // esto lanza UnimplementedError en cada test.
@@ -80,11 +81,15 @@ class _Auth extends Fake implements fba.FirebaseAuth {
   @override
   final fba.User? currentUser;
   Completer<fba.UserCredential>? credential;
+  String? submittedPassword;
   @override
   Future<fba.UserCredential> signInWithEmailAndPassword({
     required String email,
     required String password,
-  }) => credential!.future;
+  }) {
+    submittedPassword = password;
+    return credential!.future;
+  }
 }
 
 class _UserService extends Fake implements UserService {
@@ -120,7 +125,7 @@ class _UserService extends Fake implements UserService {
   @override
   void getUserFromFirebase(fba.User firebaseUser) {
     firebaseFallbacks++;
-    user = AppUser(id: 'new-account', email: firebaseUser.email ?? '');
+    user = AppUser(id: firebaseUser.uid, email: firebaseUser.email ?? '');
   }
 
   @override
@@ -130,7 +135,7 @@ class _UserService extends Fake implements UserService {
 class _Hive extends Fake implements AppHiveController {
   int writes = 0;
   @override
-  Future<void> writeProfileInfo({bool overwrite = false}) async => writes++;
+  Future<void> writeProfileInfo({bool overwrite = false, bool throwOnError = false}) async => writes++;
 }
 
 class _LoginController extends LoginController {
@@ -281,7 +286,6 @@ void main() {
     (tester) async {
       await mount(tester);
       final draft = AppUser(
-        id: 'owner@example.test',
         email: 'owner@example.test',
         name: 'Signup draft',
       );
@@ -292,10 +296,56 @@ void main() {
       controller.signedInWith = SignedInWith.signUp;
       await controller.handleAuthChanged(auth.currentUser);
       expect(identical(service.user, draft), isTrue);
+      expect(service.user.id, 'auth-id');
+      expect(service.user.name, 'Signup draft');
       expect(controller.introCalls, 1);
       expect(service.firebaseFallbacks, 0);
     },
   );
+
+  testWidgets('new signup preserves the case-sensitive Firebase UID', (tester) async {
+    await mount(tester);
+    service
+      ..fail = false
+      ..missing = true
+      ..user = AppUser(email: 'owner@example.test', name: 'Draft');
+    controller.signedInWith = SignedInWith.signUp;
+    await controller.handleAuthChanged(_FirebaseUser(uid: 'AbC-FirebaseUID'));
+    expect(service.user.id, 'AbC-FirebaseUID');
+    expect(controller.introCalls, 1);
+  });
+
+  testWidgets('existing account keeps its legacy ID despite a signup draft', (tester) async {
+    await mount(tester);
+    Sint.put<AppHiveController>(_Hive(), permanent: true);
+    service
+      ..fail = false
+      ..user = AppUser(email: 'owner@example.test', name: 'Stale draft');
+    controller.signedInWith = SignedInWith.signUp;
+    await controller.handleAuthChanged(auth.currentUser);
+    await tester.pumpAndSettle();
+    expect(service.user.id, 'existing-account');
+    expect(controller.authStatus.value, AuthStatus.loggedIn);
+    expect(controller.introCalls, 0);
+    expect(service.firebaseFallbacks, 0);
+  });
+
+  testWidgets('signup cannot reuse a draft belonging to a different email', (tester) async {
+    await mount(tester);
+    final draft = AppUser(email: 'someone-else@example.test', name: 'Other draft');
+    service
+      ..fail = false
+      ..missing = true
+      ..user = draft;
+    controller.signedInWith = SignedInWith.signUp;
+    await controller.handleAuthChanged(auth.currentUser);
+    expect(identical(service.user, draft), isFalse);
+    expect(draft.id, isEmpty);
+    expect(service.user.id, 'auth-id');
+    expect(service.user.email, 'owner@example.test');
+    expect(service.firebaseFallbacks, 1);
+    expect(controller.introCalls, 1);
+  });
 
   testWidgets('query uses Auth token email, not a different provider email', (
     tester,
@@ -315,7 +365,7 @@ void main() {
       _FirebaseUser(email: null, provider: 'password'),
     );
     await tester.pumpAndSettle();
-    expect(service.lookups, ['id:provider-id']);
+    expect(service.lookups, ['id:auth-id']);
     expect(controller.hasAccountLoadError.value, isTrue);
     expect(controller.introCalls, 0);
   });
@@ -334,4 +384,14 @@ void main() {
       expect(controller.introCalls, 0);
     },
   );
+
+  testWidgets('login keeps the exact password used at signup', (tester) async {
+    await mount(tester);
+    auth.credential = Completer<fba.UserCredential>();
+    controller.passwordController.text = '  Secret-pass-123  ';
+    final signingIn = controller.emailLogin();
+    auth.credential!.complete(_Credential(auth.currentUser!));
+    await signingIn;
+    expect(auth.submittedPassword, '  Secret-pass-123  ');
+  });
 }

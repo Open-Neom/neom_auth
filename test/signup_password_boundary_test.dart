@@ -11,7 +11,11 @@ void main() {
       email: ' TEST.USER@EXAMPLE.TEST ',
     );
 
-    expect(user.id, 'test.user@example.test');
+    expect(
+      user.id,
+      isEmpty,
+      reason: 'Only Firebase Auth may assign the new account UID',
+    );
     expect(user.email, 'test.user@example.test');
     expect(user.name, 'Cuenta Prueba');
     expect(user.firstName, 'Prueba');

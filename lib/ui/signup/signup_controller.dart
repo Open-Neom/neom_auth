@@ -4,8 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:neom_commons/utils/app_utilities.dart';
 import 'package:neom_commons/utils/constants/translations/message_translation_constants.dart';
 import 'package:neom_core/app_config.dart';
-import 'package:neom_core/data/firestore/constants/app_firestore_constants.dart';
-import 'package:neom_core/data/firestore/user_firestore.dart';
 import 'package:neom_core/domain/model/app_user.dart';
 import 'package:neom_core/domain/use_cases/login_service.dart';
 import 'package:neom_core/domain/use_cases/user_service.dart';
@@ -18,9 +16,22 @@ import '../../domain/use_cases/signup_service.dart';
 import '../../utils/constants/auth_translation_constants.dart';
 
 class SignUpController extends SintController implements SignUpService {
+  SignUpController({
+    LoginService? loginService,
+    UserService? userService,
+    void Function(String title, String message)? showMessage,
+  }) : loginServiceImpl = loginService ?? Sint.find<LoginService>(),
+       userServiceImpl = userService ?? Sint.find<UserService>(),
+       _showMessage = showMessage ?? _defaultShowMessage;
 
-  final loginServiceImpl = Sint.find<LoginService>();
-  final userServiceImpl = Sint.find<UserService>();
+  final LoginService loginServiceImpl;
+  final UserService userServiceImpl;
+  final void Function(String title, String message) _showMessage;
+  bool _submitting = false;
+
+  static void _defaultShowMessage(String title, String message) {
+    AppUtilities.showSnackBar(title: title, message: message);
+  }
 
   final TextEditingController firstNameController = TextEditingController();
   final TextEditingController lastNameController = TextEditingController();
@@ -72,72 +83,82 @@ class SignUpController extends SintController implements SignUpService {
 
   @override
   Future<bool> submit(BuildContext context) async {
+    if (_submitting) return false;
+    _submitting = true;
     AppConfig.logger.d("Submitting Sign-up form");
 
     try {
-      if(await validateInfo()) {
-        setUserFromSignUp();
-        // Auth listeners can fire before the credential future completes.
-        loginServiceImpl.signedInWith = SignedInWith.signUp;
-
-        User? fbaUser = (await loginServiceImpl.auth
-            .createUserWithEmailAndPassword(
+      if (!await validateInfo()) return false;
+      setUserFromSignUp();
+      // Auth listeners can fire before the credential future completes.
+      loginServiceImpl.signedInWith = SignedInWith.signUp;
+      final fbaUser =
+          (await loginServiceImpl.auth.createUserWithEmailAndPassword(
             email: emailController.text.toLowerCase().trim(),
-            password: passwordController.text.trim())
-        ).user;
-
-        loginServiceImpl.signedInWith = SignedInWith.signUp;
-        loginServiceImpl.fbaUser = fbaUser;
+            password: passwordController.text,
+          )).user;
+      if (fbaUser == null) {
+        _showMessage(
+          MessageTranslationConstants.accountSignUp.tr,
+          AuthTranslationConstants.signUpFailed.tr,
+        );
+        return false;
       }
+      loginServiceImpl.signedInWith = SignedInWith.signUp;
+      loginServiceImpl.fbaUser = fbaUser;
+      return true;
     } on FirebaseAuthException catch (e) {
-      String fbAuthExceptionMsg = "";
-      switch(e.code) {
-        case AppFirestoreConstants.emailInUse:
-          fbAuthExceptionMsg = MessageTranslationConstants.emailUsed;
-          break;
-        case AppFirestoreConstants.operationNotAllowed:
-          fbAuthExceptionMsg = AppFirestoreConstants.operationNotAllowed;
-          break;
-        case "":
-          break;
-      }
-
-      AppUtilities.showSnackBar(
-          title: MessageTranslationConstants.accountSignUp.tr,
-          message: fbAuthExceptionMsg.tr);
+      _showMessage(
+        MessageTranslationConstants.accountSignUp.tr,
+        signUpErrorMessage(e.code).tr,
+      );
       return false;
-    } catch (e) {
-      AppUtilities.showSnackBar(
-          title: MessageTranslationConstants.accountSignUp.tr,
-          message: e.toString());
+    } catch (e, st) {
+      NeomErrorLogger.recordErrorLight(
+        e,
+        st,
+        module: 'neom_auth',
+        operation: 'submitSignUp',
+      );
+      _showMessage(
+        MessageTranslationConstants.accountSignUp.tr,
+        AuthTranslationConstants.signUpFailed.tr,
+      );
       return false;
+    } finally {
+      _submitting = false;
     }
-
-    return true;
   }
+
+  @visibleForTesting
+  static String signUpErrorMessage(String code) => switch (code) {
+    'email-already-in-use' => MessageTranslationConstants.emailUsed,
+    'invalid-email' => MessageTranslationConstants.invalidEmailFormat,
+    'weak-password' => AuthTranslationConstants.signUpWeakPassword,
+    'operation-not-allowed' => AuthTranslationConstants.authMethodUnavailable,
+    'network-request-failed' => AuthTranslationConstants.authNetworkError,
+    'too-many-requests' => AuthTranslationConstants.authTooManyRequests,
+    _ => AuthTranslationConstants.signUpFailed,
+  };
 
   void setUserFromSignUp() {
     AppConfig.logger.d("Getting User Info From Sign-up text fields");
 
-    try {
-      userServiceImpl.user = buildUserFromSignUp(
-        homeTown: AuthTranslationConstants.somewhereUniverse.tr,
-        username: usernameController.text,
-        firstName: firstNameController.text,
-        lastName: lastNameController.text,
-        email: emailController.text,
-      );
-    } catch (e, st) {
-      NeomErrorLogger.recordError(e, st, module: 'neom_auth', operation: 'setUserFromSignUp');
-    }
-
-    AppConfig.logger.d("User Info set: ${userServiceImpl.user.toString()}");
+    userServiceImpl.user = buildUserFromSignUp(
+      homeTown: AuthTranslationConstants.somewhereUniverse.tr,
+      username: usernameController.text,
+      firstName: firstNameController.text,
+      lastName: lastNameController.text,
+      email: emailController.text,
+    );
+    AppConfig.logger.d('Registration draft prepared');
   }
 
-  /// Builds the application profile for a newly authenticated Firebase user.
+  /// Builds the unpersisted registration draft before Firebase Auth succeeds.
   ///
   /// The password is deliberately absent: it is submitted only to Firebase
   /// Authentication and must never enter the persistable [AppUser] model.
+  /// The authenticated UID is attached later by the account-loading flow.
   @visibleForTesting
   static AppUser buildUserFromSignUp({
     required String homeTown,
@@ -154,45 +175,48 @@ class SignUpController extends SintController implements SignUpService {
       firstName: firstName.trim(),
       lastName: lastName.trim(),
       email: normalizedEmail,
-      id: normalizedEmail,
+      // Firebase Auth assigns the UID only after account creation succeeds.
+      // The login/onboarding flow attaches that UID to this unpersisted draft.
+      id: '',
     );
   }
 
   @override
   Future<bool> validateInfo() async {
-
-    String validatorMsg = Validator.validateName(firstNameController.text);
+    String validatorMsg = Validator.validateName(
+      firstNameController.text.trim(),
+    );
 
     if (validatorMsg.isEmpty) {
-
-      validatorMsg = Validator.validateName(lastNameController.text);
+      validatorMsg = Validator.validateName(lastNameController.text.trim());
 
       if (validatorMsg.isEmpty) {
-        validatorMsg = Validator.validateUsername(usernameController.text);
+        validatorMsg = Validator.validateUsername(
+          usernameController.text.trim(),
+        );
 
-        if (validatorMsg.isEmpty && emailController.text.isEmpty
-            && passwordController.text.isEmpty) {
+        if (validatorMsg.isEmpty &&
+            emailController.text.isEmpty &&
+            passwordController.text.isEmpty) {
           validatorMsg = MessageTranslationConstants.pleaseFillSignUpForm;
         }
 
         if (validatorMsg.isEmpty) {
-          validatorMsg = Validator.validateEmail(emailController.text);
+          validatorMsg = Validator.validateEmail(emailController.text.trim());
         }
         if (validatorMsg.isEmpty) {
           validatorMsg = Validator.validatePassword(
-            passwordController.text, confirmController.text);
+            passwordController.text,
+            confirmController.text,
+          );
         }
       }
     }
 
-    if(validatorMsg.isEmpty && !await UserFirestore().isAvailableEmail(emailController.text)) {
-      validatorMsg = MessageTranslationConstants.emailUsed;
-    }
-
     if (validatorMsg.isNotEmpty) {
-      AppUtilities.showSnackBar(
-        title: MessageTranslationConstants.accountSignUp.tr,
-        message: validatorMsg.tr,
+      _showMessage(
+        MessageTranslationConstants.accountSignUp.tr,
+        validatorMsg.tr,
       );
 
       return false;
@@ -208,9 +232,12 @@ class SignUpController extends SintController implements SignUpService {
     try {
       agreeTerms.value = agree;
     } catch (e, st) {
-      NeomErrorLogger.recordError(e, st, module: 'neom_auth', operation: 'setTermsAgreement');
+      NeomErrorLogger.recordErrorLight(
+        e,
+        st,
+        module: 'neom_auth',
+        operation: 'setTermsAgreement',
+      );
     }
-
   }
-
 }

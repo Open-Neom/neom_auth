@@ -14,6 +14,13 @@ class AuthTranslationConstants {
 
   // Account signup
   static const String accountSignUp = 'accountSignUp';
+  static const String signUpFailed = 'signUpFailed';
+  static const String signUpWeakPassword = 'signUpWeakPassword';
+  static const String authMethodUnavailable = 'authMethodUnavailable';
+  static const String authNetworkError = 'authNetworkError';
+  static const String authTooManyRequests = 'authTooManyRequests';
+  static const String passwordResetRequested = 'passwordResetRequested';
+  static const String passwordResetFailed = 'passwordResetFailed';
 
   // Login errors
   static const String accountLoadErrorTitle = 'accountLoadErrorTitle';
